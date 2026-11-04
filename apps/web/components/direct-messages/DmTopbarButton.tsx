@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { DmIcon } from "@/components/ui/DmIcon";
+import { RECLICK_REFRESH_PAGE } from "@/lib/navigation-guard";
 import { useDmUnreadBadge } from "./hooks/useDmUnreadBadge";
 
 /**
@@ -18,7 +19,7 @@ export function DmTopbarButton({ userId }: { userId: string }) {
   return (
     <Link
       href="/dashboard/messages"
-      data-refresh-on-reclick
+      data-refresh-on-reclick={RECLICK_REFRESH_PAGE}
       aria-label={unreadCount > 0 ? `${unreadCount} unread conversations` : "Messages"}
       aria-current={active ? "page" : undefined}
       title="Messages"

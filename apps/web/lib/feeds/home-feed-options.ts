@@ -33,6 +33,10 @@ export const HOME_FEED_SCOPE_STORAGE_KEY = "uxcommunity:home-feed-scope";
 export const HOME_FEED_SCOPE_COOKIE = "uxcommunity_feed_scope";
 const SCOPE_CHANGED = "uxcommunity:home-feed-scope-changed";
 
+/** Topic the Feed links dispatch on a same-route re-click (see
+ *  `RECLICK_REFRESH_EVENT`); the mounted feed refetches its own list. */
+export const HOME_FEED_RECLICK_TOPIC = "feed";
+
 export function subscribeHomeFeedScope(listener: () => void) {
   window.addEventListener("storage", listener);
   window.addEventListener(SCOPE_CHANGED, listener);

@@ -16,6 +16,7 @@ import {
   subscribeCreateCommunityDialog,
 } from "@/lib/communities/create-community-dialog";
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
+import { HOME_FEED_RECLICK_TOPIC } from "@/lib/feeds/home-feed-options";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { prefetchCommunityRoute } from "@/lib/navigation/community-prefetch";
 import { useInAppBrowserNotifications } from "@/lib/notifications-browser";
@@ -108,7 +109,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
           <li>
             <Link
               href="/dashboard"
-              data-refresh-on-reclick
+              data-refresh-on-reclick={HOME_FEED_RECLICK_TOPIC}
               className={`flex items-center gap-[11px] rounded-lg px-[13px] py-[7px] font-body text-sm font-normal transition-colors ${
                 homeActive
                   ? "bg-surface-raised text-foreground"

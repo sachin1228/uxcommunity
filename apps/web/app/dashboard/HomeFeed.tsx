@@ -11,7 +11,8 @@ import { afterDashboardPaint, markDashboardPaint } from "@/lib/login-performance
 import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
 import { applyContentChanges } from "@/lib/communities/content-sync";
 import { useContentChanges } from "@/lib/communities/use-content-changes";
-import { type HomeFeedFilterScope } from "@/lib/feeds/home-feed-options";
+import { type HomeFeedFilterScope, HOME_FEED_RECLICK_TOPIC } from "@/lib/feeds/home-feed-options";
+import { RECLICK_REFRESH_EVENT, type ReclickRefreshDetail } from "@/lib/navigation-guard";
 
 interface HomeFeedProps {
   currentUserId: string;
@@ -92,6 +93,17 @@ export function HomeFeed({ currentUserId, refreshToken = 0, scope, initialItems 
   // Refetch when returning after a real absence (no realtime subscription keeps
   // the feed current); brief alt-tabs no longer fire a request each.
   useHiddenCatchUp(() => void fetchFeed(true));
+
+  // Re-clicking the Feed link refetches only this list; the app shell and the
+  // sidebar stay mounted (the guard drops same-route transitions).
+  useEffect(() => {
+    function onReclickRefresh(event: Event) {
+      const topic = (event as CustomEvent<ReclickRefreshDetail>).detail?.topic;
+      if (topic === HOME_FEED_RECLICK_TOPIC) void fetchFeed(true, true);
+    }
+    window.addEventListener(RECLICK_REFRESH_EVENT, onReclickRefresh);
+    return () => window.removeEventListener(RECLICK_REFRESH_EVENT, onReclickRefresh);
+  }, [fetchFeed]);
 
   /**
    * Card mutations are local-first: the list has already patched itself, so this

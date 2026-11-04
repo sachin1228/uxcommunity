@@ -12,6 +12,7 @@ import {
   NAVIGATION_LOCK_MS,
   BACK_LOCK_MS,
   REFRESH_ON_RECLICK_ATTR,
+  RECLICK_REFRESH_PAGE,
 } from "./navigation-guard"
 
 // Every test runs against module-level guard state — reset it so tests are
@@ -180,11 +181,16 @@ function mountClickGuard(pathname?: string) {
   }
 
   const assigned: string[] = []
+  const dispatched: CustomEvent[] = []
   if (pathname !== undefined) {
     ;(globalThis as unknown as { window?: unknown }).window = {
       location: {
         pathname,
         assign: (url: string) => assigned.push(url),
+      },
+      dispatchEvent: (event: Event) => {
+        dispatched.push(event as CustomEvent)
+        return true
       },
     }
   }
@@ -193,11 +199,13 @@ function mountClickGuard(pathname?: string) {
   const cleanup = installLinkClickGuard(800)
   const handler = listeners.find((l) => l.type === "click")!.fn
 
-  function click(href: string, options: { refreshOnReclick?: boolean } = {}) {
+  function click(href: string, options: { refreshOnReclick?: string } = {}) {
     const anchor = {
-      getAttribute: (name: string) => (name === "href" ? href : null),
-      hasAttribute: (name: string) =>
-        name === REFRESH_ON_RECLICK_ATTR && options.refreshOnReclick === true,
+      getAttribute: (name: string) => {
+        if (name === "href") return href
+        if (name === REFRESH_ON_RECLICK_ATTR) return options.refreshOnReclick ?? null
+        return null
+      },
     }
     const event: Record<string, unknown> = {
       button: 0,
@@ -216,6 +224,7 @@ function mountClickGuard(pathname?: string) {
 
   return {
     assigned,
+    dispatched,
     click,
     teardown() {
       cleanup()
@@ -232,30 +241,67 @@ test("re-clicking a link for the current route is a silent no-op without opt-in"
   const sameRoute = dom.click("/dashboard/library")
   assert.equal(sameRoute.defaultPrevented, true, "the guard owns the click")
   assert.deepEqual(dom.assigned, [], "a non-opt-in link never reloads the page")
+  assert.deepEqual(dom.dispatched, [], "and never asks a surface to refetch")
 
   dom.teardown()
 })
 
-test("re-clicking an opt-in link for the current route reloads the page once", () => {
-  const dom = mountClickGuard("/dashboard")
+test("re-clicking a page-mode opt-in link for the current route reloads the page once", () => {
+  const dom = mountClickGuard("/dashboard/messages")
 
-  const first = dom.click("/dashboard", { refreshOnReclick: true })
+  const first = dom.click("/dashboard/messages", { refreshOnReclick: RECLICK_REFRESH_PAGE })
   assert.equal(first.defaultPrevented, true, "the guard owns the click")
-  assert.deepEqual(dom.assigned, ["/dashboard"], "the current-route click reloads the page")
+  assert.deepEqual(dom.assigned, ["/dashboard/messages"], "the current-route click reloads the page")
   assert.equal(
     (globalThis as unknown as { history: { scrollRestoration: string } }).history.scrollRestoration,
     "manual",
     "scroll restoration is off so the refresh lands at the top",
   )
 
-  const burst = dom.click("/dashboard", { refreshOnReclick: true })
+  const burst = dom.click("/dashboard/messages", { refreshOnReclick: RECLICK_REFRESH_PAGE })
   assert.equal(burst.defaultPrevented, true, "the burst click is swallowed")
-  assert.deepEqual(dom.assigned, ["/dashboard"], "the burst does not restart the load")
+  assert.deepEqual(dom.assigned, ["/dashboard/messages"], "the burst does not restart the load")
 
-  const otherRoute = dom.click("/dashboard/messages", { refreshOnReclick: true })
+  const otherRoute = dom.click("/dashboard", { refreshOnReclick: RECLICK_REFRESH_PAGE })
   assert.equal(otherRoute.defaultPrevented, false, "different destination is allowed")
 
   dom.teardown()
+})
+
+test("re-clicking a topic opt-in link refetches its surface without a page load", () => {
+  const dom = mountClickGuard("/dashboard")
+
+  const first = dom.click("/dashboard", { refreshOnReclick: "feed" })
+  assert.equal(first.defaultPrevented, true, "the guard owns the click")
+  assert.deepEqual(dom.assigned, [], "no document reload")
+  assert.equal(dom.dispatched.length, 1, "one in-place refresh event")
+  assert.equal(
+    (dom.dispatched[0] as CustomEvent<{ topic: string }>).detail.topic,
+    "feed",
+    "the event names the surface to refetch",
+  )
+
+  const burst = dom.click("/dashboard", { refreshOnReclick: "feed" })
+  assert.equal(burst.defaultPrevented, true, "the burst click is swallowed")
+  assert.equal(dom.dispatched.length, 1, "the burst does not refetch again")
+
+  const otherRoute = dom.click("/dashboard/messages", { refreshOnReclick: "feed" })
+  assert.equal(otherRoute.defaultPrevented, false, "different destination is allowed")
+
+  dom.teardown()
+})
+
+test("a later re-click can refresh the surface again once the lock window passes", () => {
+  const clock = freezeTime(1_000_000)
+  const dom = mountClickGuard("/dashboard")
+
+  dom.click("/dashboard", { refreshOnReclick: "feed" })
+  clock.advance(NAVIGATION_LOCK_MS + 1)
+  dom.click("/dashboard", { refreshOnReclick: "feed" })
+
+  assert.equal(dom.dispatched.length, 2, "the lock only collapses a burst")
+  dom.teardown()
+  clock.restore()
 })
 
 test("link click guard swallows rapid duplicate clicks on the same internal link", () => {

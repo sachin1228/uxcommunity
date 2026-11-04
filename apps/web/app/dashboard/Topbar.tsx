@@ -12,6 +12,8 @@ import { LimitsRing } from "./LimitsRing";
 import { DmTopbarButton } from "@/components/direct-messages/DmTopbarButton";
 import { ProfileDropdown } from "./ProfileDropdown";
 import { isApplePlatform } from "@/lib/dashboard/topbar";
+import { HOME_FEED_RECLICK_TOPIC } from "@/lib/feeds/home-feed-options";
+import { RECLICK_REFRESH_PAGE } from "@/lib/navigation-guard";
 import { DeferredDashboard } from "./DashboardStartup";
 import { DmIcon } from "@/components/ui/DmIcon";
 import { NotificationBellIcon } from "@/components/ui/NotificationBellIcon";
@@ -94,7 +96,7 @@ export function Topbar({ userId, user }: Props) {
         </SidebarRouteGate>
         <Link
           href="/dashboard"
-          data-refresh-on-reclick
+          data-refresh-on-reclick={HOME_FEED_RECLICK_TOPIC}
           className="flex min-w-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           <BrandLogo iconClassName="h-6 w-6" wordmarkClassName="text-sm" />
@@ -125,7 +127,7 @@ export function Topbar({ userId, user }: Props) {
       {/* Messages, bell, then profile: the account controls stay pinned to the
           right edge at every width. */}
       <div className="order-4 ml-auto flex min-w-0 items-center gap-2">
-        <DeferredDashboard fallback={<Link href="/dashboard/messages" data-refresh-on-reclick prefetch={false} aria-label="Messages" className="flex h-8 w-8 items-center justify-center text-foreground-muted"><DmIcon size={18} /></Link>}>
+        <DeferredDashboard fallback={<Link href="/dashboard/messages" data-refresh-on-reclick={RECLICK_REFRESH_PAGE} prefetch={false} aria-label="Messages" className="flex h-8 w-8 items-center justify-center text-foreground-muted"><DmIcon size={18} /></Link>}>
           <DmTopbarButton userId={userId} />
         </DeferredDashboard>
         <LimitsRing />

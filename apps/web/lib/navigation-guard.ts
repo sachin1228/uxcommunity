@@ -11,10 +11,10 @@
  *   - A push/replace to a destination seen within the lock window is ignored.
  *   - A push/replace to the route you're already on is a no-op for programmatic
  *     navigation. A link CLICK to the current route never navigates either. It
- *     reloads the page only when the link opts in with
- *     `data-refresh-on-reclick` (the feed and messages links) — the "re-open
- *     the current section" gesture; every other same-route link is a silent
- *     no-op.
+ *     refreshes its own surface only when the link opts in with
+ *     `data-refresh-on-reclick` — a full reload for `"page"` (messages), an
+ *     in-place `RECLICK_REFRESH_EVENT` for any other topic (the feed); every
+ *     other same-route link is a silent no-op.
  *   - The lock expires automatically (default 800 ms) or as soon as the route
  *     settles via `settleNavigation`, after which the same destination can be
  *     navigated to again.
@@ -39,11 +39,24 @@ export const NAVIGATION_LOCK_MS = 800;
 export const BACK_LOCK_MS = 300;
 
 /**
- * Marks a link whose current-route click should reload the page. Only surfaces
- * with live content that the user may want to re-fetch — the feed and the
- * messages list — carry it; every other link just swallows a same-route click.
+ * Marks a link whose current-route click re-fetches its own surface. The value
+ * selects how:
+ *   - `"page"` — a full document reload.
+ *   - any other string — dispatched as a `RECLICK_REFRESH_EVENT` topic that the
+ *     mounted surface listens for and refetches itself in place.
+ * Every other link just swallows a same-route click.
  */
 export const REFRESH_ON_RECLICK_ATTR = "data-refresh-on-reclick";
+
+/** `data-refresh-on-reclick` value for a full document reload. */
+export const RECLICK_REFRESH_PAGE = "page";
+
+/** Event carrying `{ topic }` for in-place re-click refreshes. */
+export const RECLICK_REFRESH_EVENT = "uxcommunity:reclick-refresh";
+
+export interface ReclickRefreshDetail {
+  topic: string;
+}
 
 const pendingNavigations = new Map<string, number>();
 let lastBackAt = 0;
@@ -51,6 +64,8 @@ let installedClickGuard: (() => void) | null = null;
 /** Set once a current-route click has started a page refresh, so a click
  *  burst during the unload doesn't restart the load over and over. */
 let refreshing = false;
+/** Last in-place topic refresh, so a click burst fires one refetch. */
+let lastTopicRefreshAt = 0;
 
 function normalizePath(path: string): string {
   const withoutQueryAndHash = path.split("?")[0].split("#")[0];
@@ -118,6 +133,7 @@ export function resetNavigationGuard() {
   pendingNavigations.clear();
   lastBackAt = 0;
   refreshing = false;
+  lastTopicRefreshAt = 0;
 }
 
 function isInternalHref(href: string): boolean {
@@ -131,6 +147,11 @@ function isInternalHref(href: string): boolean {
   );
 }
 
+function scrollMainToTop(): void {
+  if (typeof document === "undefined") return;
+  document.querySelector("main")?.scrollTo?.(0, 0);
+}
+
 /**
  * Reloads `href` as a full document load — what re-clicking an opt-in link for
  * the page you're already on performs. A real load rather than a router push,
@@ -141,7 +162,7 @@ function isInternalHref(href: string): boolean {
 export function refreshPage(href: string): void {
   if (typeof window === "undefined") return;
   if (typeof history !== "undefined") history.scrollRestoration = "manual";
-  document.querySelector("main")?.scrollTo?.(0, 0);
+  scrollMainToTop();
   window.location.assign(href);
 }
 
@@ -154,10 +175,11 @@ export function refreshPage(href: string): void {
  * clicks on one link produces a single route transition (and therefore a
  * single RSC request) instead of 10.
  *
- * A click on a link whose destination is the route already on screen is
- * swallowed — never a second transition — and reloads the page only when the
- * link opted in with `data-refresh-on-reclick` (see `refreshPage`), while a
- * burst of such clicks during the load stays swallowed.
+ * A click on a link whose destination is the route already on screen never
+ * starts a transition. Links opted in with `data-refresh-on-reclick` re-fetch
+ * their surface instead — a full reload for `"page"`, or an in-place
+ * `RECLICK_REFRESH_EVENT` for any other topic — while a click burst stays
+ * collapsed to one refresh.
  *
  * Returns a cleanup function. Idempotent: installing twice is a no-op.
  */
@@ -180,15 +202,30 @@ export function installLinkClickGuard(lockMs = NAVIGATION_LOCK_MS): () => void {
       typeof window === "undefined" ? undefined : window.location.pathname;
     if (currentPath && samePath(currentPath, href)) {
       // A link to the page you're on never starts another transition. Only
-      // opt-in links reload the surface (feed, messages); everything else is a
-      // silent no-op. Swallow the burst after the first refresh so a click
-      // storm doesn't restart the load over and over.
+      // opt-in links refresh their surface; everything else is a silent no-op.
       event.preventDefault();
       event.stopImmediatePropagation();
-      if (target.hasAttribute(REFRESH_ON_RECLICK_ATTR) && !refreshing) {
+      const refresh = target.getAttribute(REFRESH_ON_RECLICK_ATTR);
+      if (!refresh) return;
+      if (refresh === RECLICK_REFRESH_PAGE) {
+        // Swallow the burst after the first refresh so a click storm doesn't
+        // restart the load over and over.
+        if (refreshing) return;
         refreshing = true;
         refreshPage(href);
+        return;
       }
+      // In-place refresh: one topic event per lock window, so a burst is a
+      // single refetch and a later re-click still refreshes again.
+      const now = Date.now();
+      if (now - lastTopicRefreshAt < lockMs) return;
+      lastTopicRefreshAt = now;
+      scrollMainToTop();
+      window.dispatchEvent(
+        new CustomEvent<ReclickRefreshDetail>(RECLICK_REFRESH_EVENT, {
+          detail: { topic: refresh },
+        }),
+      );
       return;
     }
     if (!allowNavigation(href, lockMs, currentPath)) {
