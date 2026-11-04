@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Animated, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,12 +16,10 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 export function VideoPlayerModal({
   url,
   poster,
-  title,
   onClose,
 }: {
   url: string;
   poster?: string | null;
-  title?: string | null;
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
@@ -79,14 +77,6 @@ export function VideoPlayerModal({
         >
           <Feather name="x" size={22} color="#FFFFFF" />
         </Pressable>
-        {title ? (
-          <Text
-            style={[styles.title, { bottom: Math.max(insets.bottom, 16) + 8 }]}
-            numberOfLines={2}
-          >
-            {title}
-          </Text>
-        ) : null}
       </View>
     </Modal>
   );
@@ -105,15 +95,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.45)',
-  },
-  title: {
-    position: 'absolute',
-    left: 20,
-    right: 20,
-    fontFamily: 'Geist_500Medium',
-    fontSize: 13,
-    lineHeight: 18,
-    color: 'rgba(255, 255, 255, 0.85)',
-    textAlign: 'center',
   },
 });
