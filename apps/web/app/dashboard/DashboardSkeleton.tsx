@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { BrandLogo } from "@/components/ui/BrandLogo";
+import { DashboardSingleColumn } from "./ContentLoader";
+import { HomeSidebarSkeleton } from "./HomeSidebarSkeleton";
 
 export function SidebarSkeleton() {
   return (
@@ -28,6 +30,16 @@ export function FeedSkeleton() {
   );
 }
 
+/** Matches the homepage's feed and desktop suggestions columns during streaming. */
+export function HomeFeedSkeleton() {
+  return (
+    <div className="mx-auto flex w-full max-w-6xl items-start justify-center gap-6 px-4 lg:px-6">
+      <DashboardSingleColumn><FeedSkeleton /></DashboardSingleColumn>
+      <HomeSidebarSkeleton />
+    </div>
+  );
+}
+
 /** Contains no member data and may stream before registry validation finishes. */
 export function DashboardSkeleton() {
   return (
@@ -35,7 +47,7 @@ export function DashboardSkeleton() {
       <header className="flex h-12 shrink-0 items-center border-b border-border px-4"><BrandLogo iconClassName="h-6 w-6" wordmarkClassName="text-sm" /></header>
       <div className="flex min-h-0 flex-1">
         <div className="hidden min-[500px]:block"><SidebarSkeleton /></div>
-        <div className="min-w-0 flex-1"><FeedSkeleton /></div>
+        <div className="min-w-0 flex-1 overflow-hidden"><HomeFeedSkeleton /></div>
       </div>
     </div>
   );

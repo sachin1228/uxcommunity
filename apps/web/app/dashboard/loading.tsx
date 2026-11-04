@@ -1,6 +1,6 @@
-import { FeedSkeleton } from "./DashboardSkeleton";
+import { HomeFeedSkeleton } from "./DashboardSkeleton";
 
-/** Dashboard home loading boundary — only the centered feed spinner is shown. */
+/** Keeps both homepage columns visible while the route streams. */
 export default function DashboardLoading() {
-  return <FeedSkeleton />;
+  return <HomeFeedSkeleton />;
 }

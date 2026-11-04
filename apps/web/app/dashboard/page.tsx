@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { DashboardHome } from "./DashboardHome";
-import { FeedSkeleton } from "./DashboardSkeleton";
+import { HomeFeedSkeleton } from "./DashboardSkeleton";
 import { loadHomeFeedPage } from "@/lib/home/home-feed-server";
 import { createServerTimer } from "@/lib/server-timing";
 import { HOME_FEED_SCOPE_COOKIE, homeFeedScopeFromCookie } from "@/lib/feeds/home-feed-options";
@@ -12,7 +12,7 @@ import type { FeedItem } from "@/components/feeds/types";
 export const metadata = { title: "Feed — uxcommunity" };
 
 export default function DashboardPage() {
-  return <Suspense fallback={<FeedSkeleton />}><InitialDashboardFeed /></Suspense>;
+  return <Suspense fallback={<HomeFeedSkeleton />}><InitialDashboardFeed /></Suspense>;
 }
 
 async function InitialDashboardFeed() {

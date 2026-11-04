@@ -2,6 +2,7 @@ import { CommunityPhoneCard } from "@/components/home/CommunityPhoneCard";
 import { CreateCommunityCard } from "@/components/home/CreateCommunityCard";
 import { SuggestedCommunitiesCard } from "@/components/home/SuggestedCommunitiesCard";
 import type { SuggestedCommunity } from "@/lib/home/suggested";
+import { SuggestedCommunitiesSkeleton } from "./HomeSidebarSkeleton";
 
 interface HomeSidebarProps {
   suggested: SuggestedCommunity[];
@@ -16,8 +17,8 @@ interface HomeSidebarProps {
  * community" all live there already, so this rail is discovery plus one action
  * — communities worth joining, and creating one of your own.
  *
- * Data is loaded on the server by the dashboard page (see
- * lib/home/home-sidebar-server.ts) so the rail paints with the page.
+ * DeferredHomeRail loads suggestions after the initial feed paints; keep their
+ * placeholder visible until the request finishes.
  */
 export function HomeSidebar({ suggested, loading = false }: HomeSidebarProps) {
   return (
@@ -31,7 +32,7 @@ export function HomeSidebar({ suggested, loading = false }: HomeSidebarProps) {
           top-4 keeps the same gap as the feed's floating switcher. */}
       <div className="sticky top-4 flex flex-col gap-4">
         <CommunityPhoneCard />
-        {loading ? <div role="status" aria-label="Loading suggested communities" className="h-40 animate-pulse rounded-xl border border-border bg-surface" /> : <SuggestedCommunitiesCard communities={suggested} />}
+        {loading ? <SuggestedCommunitiesSkeleton /> : <SuggestedCommunitiesCard communities={suggested} />}
       </div>
     </aside>
   );
