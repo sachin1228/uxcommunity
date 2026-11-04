@@ -12,6 +12,7 @@ import { communityFeedLayout } from "../feed-layout";
 import { ResourceCard } from "./ResourceCard";
 import { CommentSection } from "../CommentSection";
 import { updateCommentReactions } from "@/lib/communities/comment-tree";
+import { publishContentChange } from "@/lib/communities/content-sync";
 
 // ── Main component ─────────────────────────────────────────────────────────
 
@@ -38,6 +39,16 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
   const [resource, setResource] = useState(initialResource);
   const [comments, setComments] = useState(initialComments);
   const isVisible = useDocumentVisible();
+
+  // Keep every cached copy of this card (resources tab, home feed, profile
+  // tabs) in step with the discussion shown here.
+  useEffect(() => {
+    publishContentChange({
+      kind: "resource",
+      id: resource.id,
+      patch: { comment_count: resource.comment_count },
+    });
+  }, [resource.id, resource.comment_count]);
 
   const fetchComments = useCallback(async () => {
     try {

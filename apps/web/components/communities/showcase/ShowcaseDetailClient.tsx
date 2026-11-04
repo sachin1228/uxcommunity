@@ -13,6 +13,7 @@ import type { ShowcaseComment, ShowcasePost } from "./types";
 import { communityFeedLayout } from "../feed-layout";
 import { CommentSection } from "../CommentSection";
 import { updateCommentReactions } from "@/lib/communities/comment-tree";
+import { publishContentChange } from "@/lib/communities/content-sync";
 
 export function ShowcaseDetailClient({
   initialPost,
@@ -47,6 +48,16 @@ export function ShowcaseDetailClient({
   const [editing, setEditing] = useState(false);
   const [confirmDeletePost, setConfirmDeletePost] = useState(false);
   const isVisible = useDocumentVisible();
+
+  // Keep every cached copy of this card (showcase tab, home feed, profile
+  // tabs) in step with the discussion shown here.
+  useEffect(() => {
+    publishContentChange({
+      kind: "showcase",
+      id: post.id,
+      patch: { comment_count: post.comment_count },
+    });
+  }, [post.id, post.comment_count]);
   const fetchComments = useCallback(async () => {
     const response = await fetch(
       `/api/communities/${communityId}/showcase/${post.id}/comments`,
