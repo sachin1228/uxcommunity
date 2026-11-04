@@ -58,6 +58,15 @@ SHA selected at dispatch and waits on the `Production` environment. Its order is
 Migrations use the single `SUPABASE_DB_URL` secret (the session-pooler Postgres
 URI); the pinned CLI version comes from `supabase/cli-version`. The one-time
 baseline ledger adoption and its protection DDL were completed on 2026-11-03.
+
+The release also re-applies `scripts/r2-cors.json` to the media bucket
+(`R2_BUCKET_NAME`). Showcase videos are uploaded straight from the browser to
+R2, so the bucket must answer the CORS preflight; without a policy R2 returns
+403 and the composer only shows "Network error during upload" (images are
+proxied through the Worker and keep working). Replacing the media bucket does
+not carry its CORS policy over — the deploy step is what makes a new bucket
+usable for video uploads.
+
 The workflow never adopts, repairs or replays the ledger; see
 [database baseline](database-baseline.md) and
 [database adoption review](database-adoption-review.md).
