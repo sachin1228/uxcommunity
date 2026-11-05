@@ -301,7 +301,10 @@ export function CommunityRow({
                 onPressIn?.();
               }
         }
-        onPressOut={selectionMode ? undefined : () => setRowPressed(false)}
+        // Always clear the local tint: the long press flips this row into
+        // selection mode mid-gesture, and a mode-dependent handler would
+        // vanish before the release that is supposed to clear it.
+        onPressOut={() => setRowPressed(false)}
         onLongPress={onLongPress}
         delayLongPress={350}
         accessibilityState={selectionMode ? { selected } : undefined}
