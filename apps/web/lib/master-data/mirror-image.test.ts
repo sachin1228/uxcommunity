@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { MASTER_IMAGE_LOOKUPS } from "@uxcommunity/shared";
 
-import { syncMasterImageToCommunities } from "./mirror-image";
+import { mirrorCommunityImageToMaster, syncMasterImageToCommunities } from "./mirror-image";
 import type { MasterTable } from "./master-tables";
 import type { DbClient } from "@/lib/r2-cleanup";
 
@@ -36,6 +36,7 @@ function makeDb(
     imageUrl: string | null;
     type: string | null;
     referenceId: string | null;
+    id: string | null;
     count: string | null;
   }> = [];
   const lookups: Array<{ table: string; column: string }> = [];
@@ -74,6 +75,7 @@ function makeDb(
               imageUrl: values?.image_url ?? null,
               type: filters.type ?? null,
               referenceId: filters.reference_id ?? null,
+              id: filters.id ?? null,
               count: countOption,
             });
             return Promise.resolve({
@@ -116,6 +118,7 @@ test("mirrors a replaced picture onto every linked community", async () => {
     imageUrl: NEW,
     type: "city",
     referenceId: "city-1",
+    id: null,
     count: "exact",
   }]);
   // Every mirror lookup was consulted before the object was written off, so a
@@ -228,4 +231,58 @@ test("each master table mirrors the community type that points at it", async () 
     });
     assert.equal(writes[0].type, communityType, `${table} should mirror ${communityType}`);
   }
+});
+
+test("an in-app replacement is written through to the community's master row", async () => {
+  const { db, writes } = makeDb();
+
+  const mirrored = await mirrorCommunityImageToMaster({
+    db,
+    type: "experience_level",
+    referenceId: "level-1",
+    imageUrl: NEW,
+  });
+
+  assert.equal(mirrored, true);
+  assert.deepEqual(writes, [{
+    table: "experience_levels",
+    imageUrl: NEW,
+    type: null,
+    referenceId: null,
+    id: "level-1",
+    count: null,
+  }]);
+});
+
+test("member-led communities have no master row to write", async () => {
+  const { db, writes } = makeDb();
+
+  const mirrored = await mirrorCommunityImageToMaster({
+    db,
+    type: "user",
+    referenceId: null,
+    imageUrl: NEW,
+  });
+
+  assert.equal(mirrored, false);
+  assert.equal(writes.length, 0);
+});
+
+test("a failed in-app master write is logged, not thrown", async () => {
+  const { db } = makeDb({ mirrorError: { message: "boom" } });
+  const logged: unknown[] = [];
+  const originalError = console.error;
+  console.error = ((...args: unknown[]) => { logged.push(args); }) as typeof console.error;
+  try {
+    const mirrored = await mirrorCommunityImageToMaster({
+      db,
+      type: "city",
+      referenceId: "city-1",
+      imageUrl: NEW,
+    });
+    assert.equal(mirrored, false);
+  } finally {
+    console.error = originalError;
+  }
+  assert.equal(logged.length, 1);
 });

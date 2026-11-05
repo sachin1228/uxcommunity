@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { loadCommunityManagerStatus, logCommunityActivity, managerActorRole } from "@/lib/communities/manager-role";
@@ -9,6 +10,7 @@ import { loadCommunityReadModel } from "@/lib/communities/read-models";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { canStoreShowcaseFlag } from "@/lib/communities/showcase-flag";
 import type { Database } from "@/lib/supabase/database.types";
+import { mirrorCommunityImageToMaster } from "@/lib/master-data/mirror-image";
 import {
   getExperienceLevelNameMap,
   getMasterImageMap,
@@ -67,11 +69,11 @@ export async function PATCH(
     await canStoreShowcaseFlag(db)
       ? db
           .from("communities")
-          .select("name, description, image_url, is_private, enabled_tabs, showcase_enabled")
+          .select("name, description, image_url, is_private, enabled_tabs, showcase_enabled, type, reference_id")
           .eq("id", id)
       : db
           .from("communities")
-          .select("name, description, image_url, is_private, enabled_tabs")
+          .select("name, description, image_url, is_private, enabled_tabs, type, reference_id")
           .eq("id", id)
   ).maybeSingle();
   // Normalise both branches to one shape: the pre-migration row has no
@@ -176,6 +178,21 @@ export async function PATCH(
   if (Object.keys(updates).length > 0) {
     const { error } = await db.from("communities").update(updates).eq("id", id);
     if (error) return NextResponse.json({ error: "Failed to update community." }, { status: 500 });
+
+    // An app-created community's picture is also its master row's picture:
+    // write a replacement through so the feed, library and Explore cards
+    // (which read the master row) show the same image. Removal stays local —
+    // the resolver falls back to the master picture, the community's default.
+    if (typeof updates.image_url === "string" && updates.image_url) {
+      if (await mirrorCommunityImageToMaster({
+        db,
+        type: before?.type ?? "",
+        referenceId: before?.reference_id ?? null,
+        imageUrl: updates.image_url,
+      })) {
+        revalidateTag("master-images", {});
+      }
+    }
 
     const previousUrl = before?.image_url ?? null;
     const nextUrl = updates.image_url ?? before?.image_url ?? null;
