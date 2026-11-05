@@ -56,7 +56,7 @@ import {
   type CommunityMuteDuration,
   type Message,
 } from '@/lib/communities';
-import { isCommunityMuted } from '@/lib/communityMute';
+import { communityMuteLabel, isCommunityMuted } from '@/lib/communityMute';
 import { communityNameBadges } from '@/lib/communityBadges';
 import {
   fmtDate,
@@ -512,17 +512,7 @@ export default function CommunityChat() {
   // never does — the same label formatting as the web dropdown (region date,
   // fixed en-US 12-hour clock). Computed here but rendered only while the
   // sheet is open, so no render formats it before a click.
-  const muteStateLabel = (() => {
-    if (!muted) return null;
-    if (resolved?.notifications_muted) return 'Muted';
-    const until = resolved?.notifications_muted_until;
-    if (!until) return null;
-    const deadline = new Date(until);
-    if (!Number.isFinite(deadline.getTime())) return null;
-    const date = deadline.toLocaleDateString();
-    const time = deadline.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    return `Muted until ${date} at ${time}`;
-  })();
+  const muteStateLabel = communityMuteLabel(resolved);
 
   /**
    * Save the caller's mute for this community and confirm with a toast —

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   AppState,
+  BackHandler,
   FlatList,
   Pressable,
   RefreshControl,
@@ -21,10 +22,18 @@ import {
   NotificationPermissionBanner,
   NotificationPermissionSheet,
 } from '@/components/communities/NotificationPermissionPrompt';
+import { CommunityMuteSheet } from '@/components/community/CommunityMuteSheet';
 import { useColors } from '@/hooks/useColors';
 import { useCommunities } from '@/hooks/useCommunities';
 import { useNotificationPermission } from '@/hooks/useNotificationPermission';
-import { Community } from '@/lib/communities';
+import {
+  Community,
+  type CommunityMuteDuration,
+  setCommunityMute,
+} from '@/lib/communities';
+import { communityStore } from '@/lib/communityStore';
+import { communityMuteLabel, isCommunityMuted } from '@/lib/communityMute';
+import { hapticImpact, hapticSelection } from '@/lib/haptics';
 import { useAuth } from '@/context/AuthContext';
 import { prefetchCommunityMessages } from '@/lib/communityMessageStoreRuntime';
 import {
@@ -39,6 +48,88 @@ import {
  * rule the web's useHiddenCatchUp applies to hidden tabs.
  */
 const FOCUS_CATCH_UP_MIN_AWAY_MS = 5_000;
+
+/** The list's one-at-a-time notice (mute confirmations and their Undo). */
+interface ListToast {
+  message: string;
+  actionLabel?: string;
+  onAction?: () => Promise<void> | void;
+}
+
+/**
+ * WhatsApp's selection toolbar. Holding a chat row replaces the workspace
+ * header with the selected count and the actions that apply to it; the only
+ * action here is the mute toggle, which reuses the chat header's ⋯ menu flow
+ * (unmute in place when already muted, otherwise the duration sheet).
+ */
+function ChatSelectionHeader({
+  count,
+  muted,
+  busy,
+  onClose,
+  onMute,
+}: {
+  count: number;
+  muted: boolean;
+  busy: boolean;
+  onClose: () => void;
+  onMute: () => void;
+}) {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  return (
+    <View
+      style={[
+        styles.header,
+        {
+          backgroundColor: colors.background,
+          borderBottomColor: colors.border,
+          paddingTop: insets.top + 8,
+        },
+      ]}
+    >
+      <View style={styles.headerLeft}>
+        <Pressable
+          onPress={onClose}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Exit selection"
+          style={({ pressed }) => [styles.headerIconBtn, { opacity: pressed ? 0.7 : 1 }]}
+        >
+          <Feather name="arrow-left" size={22} color={colors.foreground} />
+        </Pressable>
+        <Text
+          accessibilityLiveRegion="polite"
+          style={[styles.selectionCount, { color: colors.foreground }]}
+        >
+          {count}
+        </Text>
+      </View>
+      <Pressable
+        onPress={onMute}
+        disabled={busy}
+        hitSlop={6}
+        accessibilityRole="button"
+        accessibilityLabel={muted ? 'Unmute notifications' : 'Mute notifications'}
+        style={({ pressed }) => [
+          styles.headerIconBtn,
+          { opacity: busy ? 0.5 : pressed ? 0.7 : 1 },
+        ]}
+      >
+        {busy ? (
+          <ActivityIndicator size="small" color={colors.foreground} />
+        ) : (
+          <Feather
+            name={muted ? 'bell' : 'bell-off'}
+            size={20}
+            strokeWidth={2.25}
+            color={colors.foreground}
+          />
+        )}
+      </Pressable>
+    </View>
+  );
+}
 
 export default function CommunitiesScreen() {
   const { user } = useAuth();
@@ -62,6 +153,152 @@ export default function CommunitiesScreen() {
   const [notificationPromptOpen, setNotificationPromptOpen] = useState(false);
   const [notificationNoticeDismissed, setNotificationNoticeDismissed] = useState(false);
   const notificationPromptShownRef = useRef(false);
+
+  /** The row claimed by a long press; null while the list is not selecting. */
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  /** The selection toolbar's mute row opens the duration sheet. */
+  const [muteSheetOpen, setMuteSheetOpen] = useState(false);
+  const [muteBusy, setMuteBusy] = useState(false);
+  /** The list's own toast — "Chat muted" with Undo, "Chat unmuted". */
+  const [toast, setToast] = useState<ListToast | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissToast = useCallback(() => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = null;
+    setToast(null);
+  }, []);
+  const showToast = useCallback((next: ListToast) => {
+    setToast(next);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => {
+      toastTimer.current = null;
+      setToast(null);
+    }, 4000);
+  }, []);
+  useEffect(
+    () => () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    },
+    [],
+  );
+
+  const selectedCommunity = useMemo(
+    () => (selectedId ? communities.find((c) => c.id === selectedId) ?? null : null),
+    [communities, selectedId],
+  );
+  const selectionActive = selectedCommunity !== null;
+  const selectedMuted = isCommunityMuted(selectedCommunity, nowMs);
+
+  const exitSelection = useCallback(() => {
+    setSelectedId(null);
+    setMuteSheetOpen(false);
+  }, []);
+
+  const handleSelect = useCallback((community: Community) => {
+    hapticSelection();
+    setSelectedId((current) => (current === community.id ? null : community.id));
+  }, []);
+
+  const handleLongPress = useCallback((community: Community) => {
+    hapticImpact();
+    setMuteSheetOpen(false);
+    setSelectedId(community.id);
+  }, []);
+
+  // A row removed elsewhere (Exit community on another device, an archive)
+  // takes the selection with it.
+  useEffect(() => {
+    if (selectedId && !communities.some((c) => c.id === selectedId)) {
+      setSelectedId(null);
+      setMuteSheetOpen(false);
+    }
+  }, [communities, selectedId]);
+
+  // Android's back button leaves selection before it leaves the tab.
+  useEffect(() => {
+    if (!selectionActive) return undefined;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      exitSelection();
+      return true;
+    });
+    return () => sub.remove();
+  }, [selectionActive, exitSelection]);
+
+  // Leaving the tab drops the selection, like WhatsApp's chat list.
+  useFocusEffect(
+    useCallback(
+      () => () => {
+        setSelectedId(null);
+        setMuteSheetOpen(false);
+      },
+      [],
+    ),
+  );
+
+  /**
+   * Save the caller's mute for one chat and confirm with a toast — "Chat
+   * muted" with an Undo, "Chat unmuted" as a plain notice. The same endpoint,
+   * patch and copy the community chat's ⋯ menu uses; the row updates through
+   * the shared store the moment the save lands.
+   */
+  const applyMute = useCallback(
+    async (
+      communityId: string,
+      duration: CommunityMuteDuration,
+      { reportFailure = true }: { reportFailure?: boolean } = {},
+    ): Promise<boolean> => {
+      if (muteBusy) return false;
+      setMuteBusy(true);
+      try {
+        const state = await setCommunityMute(communityId, duration);
+        communityStore.notifyCommunityChanged({ kind: 'patch', communityId, patch: state });
+        if (duration === 'off') {
+          showToast({ message: 'Chat unmuted' });
+        } else {
+          showToast({
+            message: 'Chat muted',
+            actionLabel: 'Undo',
+            onAction: async () => {
+              if (!(await applyMute(communityId, 'off', { reportFailure: false }))) {
+                throw new Error('undo failed');
+              }
+            },
+          });
+        }
+        setMuteSheetOpen(false);
+        setSelectedId(null);
+        return true;
+      } catch {
+        if (reportFailure) {
+          showToast({ message: "Couldn't update notifications. Try again." });
+        }
+        return false;
+      } finally {
+        setMuteBusy(false);
+      }
+    },
+    // The undo closure references applyMute itself, exactly like the chat
+    // screen's handler.
+    [muteBusy, showToast],
+  );
+
+  const handleSelectionMute = useCallback(() => {
+    if (!selectedCommunity) return;
+    if (isCommunityMuted(selectedCommunity, nowMs)) {
+      void applyMute(selectedCommunity.id, 'off');
+    } else {
+      setMuteSheetOpen(true);
+    }
+  }, [applyMute, nowMs, selectedCommunity]);
+
+  const handleToastAction = useCallback(() => {
+    const action = toast?.onAction;
+    if (!action) return;
+    dismissToast();
+    Promise.resolve(action()).catch(() => {
+      showToast({ message: "Couldn't undo that" });
+    });
+  }, [toast, dismissToast, showToast]);
 
   // Opening the app with notifications off should explain why, not wait for
   // the banner link. Once per session; after that the banner carries it. If the
@@ -174,55 +411,82 @@ export default function CommunitiesScreen() {
         onPress={() => handleCommunityPress(item)}
         onPressIn={() => prefetchCommunityMessages(user?.id, item.id)}
         onPressAvatar={() => setPhotoCommunity(item)}
+        selectionMode={selectedId !== null}
+        selected={selectedId === item.id}
+        onLongPress={() => handleLongPress(item)}
+        onSelect={() => handleSelect(item)}
       />
     ),
-    [getTypingLabel, handleCommunityPress, nowMs, user?.id]
+    [
+      getTypingLabel,
+      handleCommunityPress,
+      handleLongPress,
+      handleSelect,
+      nowMs,
+      selectedId,
+      user?.id,
+    ],
   );
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar style={colors.isDark ? 'light' : 'dark'} />
-      <AppHeader />
+      {selectionActive ? (
+        <ChatSelectionHeader
+          count={1}
+          muted={selectedMuted}
+          busy={muteBusy}
+          onClose={exitSelection}
+          onMute={handleSelectionMute}
+        />
+      ) : (
+        <AppHeader />
+      )}
 
       {/* Search filters the joined list locally. Creating lives in the
-          floating + at the bottom-right, above the tab bar. */}
-      <View style={styles.searchRow}>
-        <View
-          style={[
-            styles.searchField,
-            { backgroundColor: colors.card, borderColor: colors.border },
-          ]}
-        >
-          <Feather name="search" size={15} color={colors.mutedForeground} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search communities…"
-            placeholderTextColor={colors.mutedForeground}
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="search"
-            accessibilityLabel="Search communities"
-            style={[styles.searchInput, { color: colors.foreground }]}
-          />
-          {query.length > 0 && (
-            <Pressable
-              onPress={() => setQuery('')}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Clear search"
-            >
-              <Feather name="x" size={14} color={colors.mutedForeground} />
-            </Pressable>
-          )}
+          floating + at the bottom-right, above the tab bar. Selection takes
+          the whole chrome over, like WhatsApp. */}
+      {!selectionActive && (
+        <View style={styles.searchRow}>
+          <View
+            style={[
+              styles.searchField,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+          >
+            <Feather name="search" size={15} color={colors.mutedForeground} />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search communities…"
+              placeholderTextColor={colors.mutedForeground}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="search"
+              accessibilityLabel="Search communities"
+              style={[styles.searchInput, { color: colors.foreground }]}
+            />
+            {query.length > 0 && (
+              <Pressable
+                onPress={() => setQuery('')}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+              >
+                <Feather name="x" size={14} color={colors.mutedForeground} />
+              </Pressable>
+            )}
+          </View>
         </View>
-      </View>
-
-      {notificationPermission === 'denied' && !notificationNoticeDismissed && (
-        <NotificationPermissionBanner
-          onDismiss={() => setNotificationNoticeDismissed(true)}
-        />
       )}
+
+      {!selectionActive &&
+        notificationPermission === 'denied' &&
+        !notificationNoticeDismissed && (
+          <NotificationPermissionBanner
+            onDismiss={() => setNotificationNoticeDismissed(true)}
+          />
+        )}
 
       {isLoading && (
         <View style={styles.center}>
@@ -280,27 +544,64 @@ export default function CommunitiesScreen() {
 
       {/* Fixed floating create — same round control the search row used to
           hold, now hovering above the tab bar while the list scrolls. */}
-      <Pressable
-        onPress={() => router.push('/create-community')}
-        hitSlop={6}
-        accessibilityRole="button"
-        accessibilityLabel="Create community"
-        style={({ pressed }) => [
-          styles.fab,
-          {
-            backgroundColor: pressed ? colors.accentHover : colors.accent,
-            borderColor: colors.accent,
-            bottom: insets.bottom + 96,
-            shadowColor: '#000000',
-          },
-        ]}
-      >
-        <Feather name="plus" size={22} color={colors.accentForeground} />
-      </Pressable>
+      {!selectionActive && (
+        <Pressable
+          onPress={() => router.push('/create-community')}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel="Create community"
+          style={({ pressed }) => [
+            styles.fab,
+            {
+              backgroundColor: pressed ? colors.accentHover : colors.accent,
+              borderColor: colors.accent,
+              bottom: insets.bottom + 96,
+              shadowColor: '#000000',
+            },
+          ]}
+        >
+          <Feather name="plus" size={22} color={colors.accentForeground} />
+        </Pressable>
+      )}
+
+      {toast && (
+        <View
+          style={[styles.toast, { backgroundColor: colors.foreground, top: insets.top + 112 }]}
+        >
+          <Text style={[styles.toastText, { color: colors.background }]}>{toast.message}</Text>
+          {toast.actionLabel && (
+            <Pressable
+              onPress={handleToastAction}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={toast.actionLabel}
+            >
+              <Text style={[styles.toastAction, { color: colors.background }]}>
+                {toast.actionLabel}
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      )}
 
       <NotificationPermissionSheet
         visible={notificationPromptOpen}
         onClose={() => setNotificationPromptOpen(false)}
+      />
+
+      {/* Mute durations for the selected row — the chat header's ⋯ menu sheet,
+          opened from the selection toolbar. */}
+      <CommunityMuteSheet
+        open={muteSheetOpen}
+        muted={selectedMuted}
+        muteStateLabel={communityMuteLabel(selectedCommunity, nowMs)}
+        busy={muteBusy}
+        onChoose={(duration) => {
+          if (selectedCommunity) void applyMute(selectedCommunity.id, duration);
+        }}
+        onClose={() => {
+          if (!muteBusy) setMuteSheetOpen(false);
+        }}
       />
 
       <PhotoViewerModal
@@ -315,6 +616,33 @@ export default function CommunitiesScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+
+  // The selection toolbar mirrors AppHeader's height so the swap reads as one
+  // header changing, not the page jumping.
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 20,
+  },
+  headerIconBtn: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectionCount: {
+    fontSize: 18,
+    fontFamily: 'Geist_600SemiBold',
+  },
+
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -352,6 +680,26 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.16,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
+  },
+  // Same toast as the chat screen's mute confirmation, parked under the
+  // search row so it never covers the field it just left.
+  toast: {
+    position: 'absolute',
+    alignSelf: 'center',
+    zIndex: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  toastText: { fontSize: 12, fontFamily: 'Geist_500Medium' },
+  toastAction: {
+    fontSize: 12,
+    fontFamily: 'Geist_700Bold',
+    textDecorationLine: 'underline',
+    marginLeft: 2,
   },
   noResults: {
     alignItems: 'center',
