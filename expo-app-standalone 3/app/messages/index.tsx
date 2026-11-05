@@ -28,6 +28,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import { clearDmUnreadLocally } from '@/hooks/useDmUnread';
 import { useDmTyping } from '@/hooks/useDmTyping';
+import { prefetchDmMessages } from '@/lib/dmMessagePrefetch';
+import { rememberDmMessages } from '@/lib/dmMessageStore';
 import { recordDmReadFloor } from '@/lib/dmReadFloor';
 import { realtimeClient, realtimeRooms } from '@/lib/realtime';
 import {
@@ -41,6 +43,7 @@ import {
   dmConversationPreview,
   dmTimestampLabel,
   isIncomingRequest,
+  previewToDmMessage,
   unreadPillLabel,
   type DmConversation,
   type DmRealtimeListMessage,
@@ -261,6 +264,14 @@ export default function MessagesScreen() {
         );
         clearDmUnreadLocally(conversation.id, true);
       }
+      // The row already carries the new message; seed the thread with it so
+      // it paints on the first frame instead of waiting for the page request.
+      if (conversation.last_message) {
+        rememberDmMessages(userId, conversation.id, [
+          previewToDmMessage(conversation.last_message, conversation.peer, user),
+        ]);
+      }
+      prefetchDmMessages(userId, conversation.id);
       router.push({
         pathname: '/messages/[id]',
         params: {
@@ -271,7 +282,7 @@ export default function MessagesScreen() {
         },
       });
     },
-    [router],
+    [router, user, userId],
   );
 
   return (

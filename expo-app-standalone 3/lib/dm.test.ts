@@ -15,6 +15,7 @@ import {
   isOutgoingRequest,
   isUnstartedRequest,
   newestMessageAt,
+  previewToDmMessage,
   requestHintForPeer,
   unreadPillLabel,
   uuidV4,
@@ -297,6 +298,32 @@ test('an own message refreshes the preview without counting unread', () => {
   );
   assert.equal(row.unread_count, 2);
   assert.equal(row.last_message?.content, 'mine');
+});
+
+test('the list preview becomes a thread row with the right author', () => {
+  const last = {
+    id: 'm-1',
+    content: 'hi',
+    image_url: null,
+    created_at: '2026-11-05T10:00:00Z',
+    user_id: PEER,
+    deleted_at: null,
+    edited_at: null,
+  };
+  const fromPeer = previewToDmMessage(last, { id: PEER, name: 'Ada', avatar_url: null }, {
+    id: VIEWER,
+    name: 'Me',
+    avatar_url: null,
+  });
+  assert.equal(fromPeer.users?.name, 'Ada');
+  assert.equal(fromPeer.content, 'hi');
+
+  const fromViewer = previewToDmMessage(
+    { ...last, user_id: VIEWER },
+    { id: PEER, name: 'Ada', avatar_url: null },
+    { id: VIEWER, name: 'Me', avatar_url: null },
+  );
+  assert.equal(fromViewer.users?.name, 'Me');
 });
 
 test('a message for an unknown conversation leaves the list untouched', () => {

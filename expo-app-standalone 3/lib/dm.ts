@@ -202,6 +202,43 @@ export function unreadPillLabel(count: number): string {
   return count > 99 ? '99+' : String(count);
 }
 
+/**
+ * The list row's newest message, shaped for the thread. Opening a chat can
+ * therefore paint the message the row already shows before the page request
+ * answers — the same instant-open the community chat gets from its push
+ * snapshot. The page then replaces this row with the full one.
+ */
+export function previewToDmMessage(
+  last: DmLastMessage,
+  peer: DmPeer,
+  viewer: { id: string; name?: string | null; avatar_url?: string | null } | null,
+): DmMessage {
+  const fromPeer = last.user_id === peer.id;
+  const fromViewer = !!viewer && last.user_id === viewer.id;
+  return {
+    id: last.id,
+    content: last.content,
+    created_at: last.created_at,
+    user_id: last.user_id,
+    reply_to_id: null,
+    image_url: last.image_url,
+    deleted_at: last.deleted_at,
+    edited_at: last.edited_at,
+    users: fromPeer
+      ? { name: peer.name, avatar_url: peer.avatar_url, designation: null }
+      : fromViewer
+        ? {
+            name: viewer.name ?? 'You',
+            avatar_url: viewer.avatar_url ?? null,
+            designation: null,
+          }
+        : null,
+    reactions: [],
+    reply_to: null,
+    status: 'sent',
+  };
+}
+
 /** The fields of a `dm-message` realtime event the list row previews. */
 export interface DmRealtimeListMessage {
   id: string;
