@@ -700,7 +700,7 @@ export async function loadJobViewer(db: SupabaseClient, userId: string): Promise
 }
 
 export interface JobMasterData {
-  cities: { id: string; name: string; imageUrl: string | null }[];
+  cities: { id: string; name: string; imageUrl: string | null; aliases?: string[] | null }[];
   sectors: { id: string; name: string; imageUrl: string | null }[];
   jobTitles: { slug: string; label: string; imageUrl: string | null }[];
   experienceLevels: { slug: string; label: string; imageUrl: string | null }[];
@@ -709,7 +709,7 @@ export interface JobMasterData {
 /** The four criteria option lists — the same master data signup offers. */
 export async function loadJobMasterData(db: SupabaseClient): Promise<JobMasterData> {
   const [cities, sectors, jobTitles, experienceLevels] = await Promise.all([
-    db.from("cities").select("id, name, image_url").eq("is_active", true).order("name"),
+    db.from("cities").select("id, name, image_url, aliases").eq("is_active", true).order("name"),
     db.from("design_sectors").select("id, name, image_url").eq("is_active", true).order("name"),
     db.from("job_titles").select("slug, name, image_url").eq("is_active", true).order("name"),
     db.from("experience_levels").select("slug, name, image_url").eq("is_active", true).order("name"),
@@ -729,6 +729,7 @@ export async function loadJobMasterData(db: SupabaseClient): Promise<JobMasterDa
       id: row.id as string,
       name: row.name as string,
       imageUrl: (row.image_url as string | null) ?? null,
+      aliases: (row.aliases as string[] | null) ?? [],
     })),
     sectors: (sectors.data ?? []).map((row) => ({
       id: row.id as string,

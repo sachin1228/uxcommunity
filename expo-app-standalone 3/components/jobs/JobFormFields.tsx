@@ -108,7 +108,12 @@ export function JobFormFields({
 
   const cityOptions: PickerOption[] = [
     { id: ALL_CITIES, name: 'All cities', image_url: null },
-    ...master.cities.map((city) => ({ id: city.id, name: city.name, image_url: city.imageUrl })),
+    ...master.cities.map((city) => ({
+      id: city.id,
+      name: city.name,
+      image_url: city.imageUrl,
+      aliases: city.aliases,
+    })),
   ];
   const sectorOptions: PickerOption[] = [
     { id: ALL_SECTORS, name: 'All sectors', image_url: null },

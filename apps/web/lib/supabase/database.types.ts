@@ -193,6 +193,7 @@ export type Database = {
       };
       cities: {
         Row: {
+          aliases: string[];
           created_at: string;
           id: string;
           image_url: string | null;
@@ -203,6 +204,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          aliases?: string[];
           created_at?: string;
           id?: string;
           image_url?: string | null;
@@ -213,6 +215,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          aliases?: string[];
           created_at?: string;
           id?: string;
           image_url?: string | null;

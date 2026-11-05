@@ -210,7 +210,7 @@ export function JobCriteriaFields({
           <SearchableSelect
             options={[
               { value: ALL_CITIES, label: "All cities" },
-              ...master.cities.map((c) => ({ value: c.id, label: c.name, imageUrl: c.imageUrl })),
+              ...master.cities.map((c) => ({ value: c.id, label: c.name, imageUrl: c.imageUrl, aliases: c.aliases })),
             ]}
             value={values.cityId}
             onChange={(cityId) => onChange({ cityId })}

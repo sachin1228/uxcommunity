@@ -501,7 +501,7 @@ export function EditProfileForm({ data, onSaved }: Props) {
                   <span>City</span>
                 </p>
                 <SearchableSelect
-                  options={data.options.cities.map((o) => ({ value: o.id, label: o.name, imageUrl: o.image_url }))}
+                  options={data.options.cities.map((o) => ({ value: o.id, label: o.name, imageUrl: o.image_url, aliases: o.aliases }))}
                   value={cityId}
                   onChange={setCityId}
                   placeholder="Select city"

@@ -42,7 +42,7 @@ export async function loadProfileIdentity(userId: string): Promise<ProfileIdenti
         .eq("user_id", userId)
         .maybeSingle(),
       db.from("profile_field_changes").select("field, changed_at").eq("user_id", userId),
-      db.from("cities").select("id, name, image_url").eq("is_active", true).order("name"),
+      db.from("cities").select("id, name, image_url, aliases").eq("is_active", true).order("name"),
       db.from("design_sectors").select("id, name, image_url").eq("is_active", true).order("name"),
       db
         .from("experience_levels")

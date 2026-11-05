@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { rankOptions } from "@/lib/search/option-search";
 
 /** Roughly what the dropdown occupies (search row + the list's max height). */
 const DROPDOWN_HEIGHT = 248;
@@ -28,6 +29,8 @@ interface Option {
   value: string;
   label: string;
   imageUrl?: string | null;
+  /** Alternate names this value is known by (e.g. Bangalore for Bengaluru). */
+  aliases?: string[] | null;
 }
 
 interface SearchableSelectProps {
@@ -60,11 +63,7 @@ export function SearchableSelect({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const filtered = query.trim()
-    ? options.filter((o) =>
-        o.label.toLowerCase().includes(query.trim().toLowerCase())
-      )
-    : options;
+  const filtered = rankOptions(options, query);
 
   const showOther = allowOther && query.trim().length > 0 && filtered.length === 0;
 

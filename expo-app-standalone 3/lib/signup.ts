@@ -21,6 +21,8 @@ export interface SignupOption {
   id: string;
   name: string;
   image_url: string | null;
+  /** Alternate names a city is known by; absent for the other master tables. */
+  aliases?: string[] | null;
 }
 
 export interface SignupOptions {
@@ -31,7 +33,7 @@ export interface SignupOptions {
 }
 
 interface CitiesResponse {
-  cities?: Array<{ id: string; name: string; image_url?: string | null }>;
+  cities?: Array<{ id: string; name: string; image_url?: string | null; aliases?: string[] | null }>;
 }
 
 interface SectorsResponse {
@@ -89,6 +91,7 @@ export async function loadSignupOptions(): Promise<SignupOptions> {
       id: city.id,
       name: city.name,
       image_url: city.image_url ?? null,
+      aliases: city.aliases ?? [],
     })),
     sectors: (sectors.data.sectors ?? []).map((sector) => ({
       id: sector.id,
