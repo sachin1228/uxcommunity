@@ -27,7 +27,7 @@ import type {
 export * from './jobFormat';
 
 export interface JobMasterData {
-  cities: { id: string; name: string; imageUrl: string | null }[];
+  cities: { id: string; name: string; imageUrl: string | null; aliases?: string[] | null }[];
   sectors: { id: string; name: string; imageUrl: string | null }[];
   jobTitles: { slug: string; label: string; imageUrl: string | null }[];
   experienceLevels: { slug: string; label: string; imageUrl: string | null }[];
@@ -69,6 +69,7 @@ export function jobMasterFromIdentity(payload: ProfileIdentityPayload): JobMaste
       id: option.id,
       name: option.name,
       imageUrl: option.image_url,
+      aliases: option.aliases ?? [],
     })),
     sectors: payload.options.sectors.map((option) => ({
       id: option.id,

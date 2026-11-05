@@ -40,6 +40,7 @@
     "test:moderation": "tsx --test apps/web/lib/communities/report-reasons.test.ts apps/web/lib/moderation/action-catalog.test.ts apps/web/lib/moderation/appeals.test.ts apps/web/lib/moderation/appeal-token.test.ts apps/web/lib/moderation/interaction-targets.test.ts apps/web/lib/moderation/moderation-contract.test.ts apps/web/lib/auth/session-route-audit.test.ts apps/web/lib/auth/liveness.test.ts apps/web/lib/auth/session-validity.test.ts",
     "test:moderation-db": "bash supabase/tests/run-local.sh supabase/tests/moderation_evidence_retention.test.sql supabase/tests/moderation_evidence_concurrency.test.sql",
     "test:signup": "tsx --test apps/web/lib/signup-completion.test.ts apps/web/lib/auth/signup-status.test.ts",
+    "test:option-search": "tsx --test apps/web/lib/search/option-search.test.ts \"expo-app-standalone 3/lib/optionSearch.test.ts\"",
     "test:mobile-signup": "tsx --test \"expo-app-standalone 3/lib/signupFlow.test.ts\"",
     "test:request-cache": "tsx --test apps/web/lib/request-cache.test.ts",
     "test:load-risk-fixes": "tsx --test apps/web/lib/realtime/reconnect-safety.test.ts apps/web/lib/communities/event-realtime.test.ts apps/web/lib/navigation/community-prefetch.test.ts \"expo-app-standalone 3/lib/communityContentRealtime.test.ts\" \"expo-app-standalone 3/lib/realtimeCore.test.ts\"",

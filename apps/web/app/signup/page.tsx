@@ -11,7 +11,7 @@ import { SignupStep3 } from "./components/SignupStep3";
 import { SignupStepper } from "./components/SignupStepper";
 import { SignupWelcome } from "./components/SignupWelcome";
 
-interface MasterItem { id: string; name: string; image_url?: string | null }
+interface MasterItem { id: string; name: string; image_url?: string | null; aliases?: string[] | null }
 
 interface LinkState {
   status: "loading" | "valid" | "invalid";

@@ -4,7 +4,7 @@ import { PendingButton } from "@/components/ui/PendingButton";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { SignupBackButton } from "./SignupStepper";
 
-interface MasterItem { id: string; name: string; image_url?: string | null }
+interface MasterItem { id: string; name: string; image_url?: string | null; aliases?: string[] | null }
 
 interface Step2State {
   city_id: string;
@@ -61,7 +61,7 @@ export function SignupStep2({
           {/* "Other" is a real row in the cities master data — selecting it must not
               create a dedicated community. */}
           <SearchableSelect
-            options={cities.map((c) => ({ value: c.id, label: c.name, imageUrl: c.image_url }))}
+            options={cities.map((c) => ({ value: c.id, label: c.name, imageUrl: c.image_url, aliases: c.aliases }))}
             value={state.city_id}
             onChange={(v) => onChange({ city_id: v })}
             placeholder="Select a city"

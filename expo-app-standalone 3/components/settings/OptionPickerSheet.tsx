@@ -18,12 +18,15 @@ import { KeyboardAvoidingView as KeyboardControllerAvoidingView } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
+import { rankOptions } from '@/lib/optionSearch';
 import { hapticSelection } from '@/lib/haptics';
 
 export interface PickerOption {
   id: string;
   name: string;
   image_url: string | null;
+  /** Alternate names the value is known by (e.g. Bangalore for Bengaluru). */
+  aliases?: string[] | null;
 }
 
 interface Props {
@@ -123,11 +126,7 @@ export function OptionPickerSheet({ visible, title, options, selectedId, onPick,
     if (!visible) setQuery('');
   }, [visible]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return options;
-    return options.filter((option) => option.name.toLowerCase().includes(q));
-  }, [options, query]);
+  const filtered = useMemo(() => rankOptions(options, query), [options, query]);
 
   const showSearch = options.length > 8;
 

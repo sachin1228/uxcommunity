@@ -9,7 +9,7 @@ export async function GET() {
   const db = createServiceClient();
   const { data, error } = await db
     .from("cities")
-    .select("id, name, image_url")
+    .select("id, name, image_url, aliases")
     .eq("is_active", true)
     .order("name");
 

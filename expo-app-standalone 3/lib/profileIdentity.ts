@@ -22,6 +22,8 @@ export interface ProfileOption {
   id: string;
   name: string;
   image_url: string | null;
+  /** Alternate names a city is known by; absent for other master tables. */
+  aliases?: string[] | null;
 }
 
 /** A community as the editor shows it — gone or gained. */
