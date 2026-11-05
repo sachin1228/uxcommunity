@@ -32,7 +32,7 @@ import {
   setCommunityMute,
 } from '@/lib/communities';
 import { communityStore } from '@/lib/communityStore';
-import { isCommunityMuted } from '@/lib/communityMute';
+import { planSelectionMute } from '@/lib/communityMute';
 import { hapticImpact, hapticSelection } from '@/lib/haptics';
 import { useAuth } from '@/context/AuthContext';
 import { prefetchCommunityMessages } from '@/lib/communityMessageStoreRuntime';
@@ -59,24 +59,26 @@ interface ListToast {
 /**
  * WhatsApp's selection toolbar. Holding a chat row replaces the workspace
  * header with the selected count and the actions that apply to it; the only
- * action here is mute, which reuses the chat header's ⋯ menu durations.
+ * action here is the mute toggle, which reuses the chat header's ⋯ menu
+ * durations.
  *
- * A selection that includes an already-muted chat cannot be muted again, so
- * the bell gives way to a hint asking for that chat to be deselected — the
- * remaining chats can then be muted together.
+ * The bell follows the selection's mute state: when every selected chat is
+ * already muted it becomes unmute and clears them in one tap; otherwise it
+ * mutes the chats that are still unmuted, leaving already-muted ones with
+ * their own duration.
  */
 function ChatSelectionHeader({
   count,
-  includesMuted,
+  allMuted,
   busy,
   onClose,
-  onMute,
+  onToggleMute,
 }: {
   count: number;
-  includesMuted: boolean;
+  allMuted: boolean;
   busy: boolean;
   onClose: () => void;
-  onMute: () => void;
+  onToggleMute: () => void;
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -108,39 +110,28 @@ function ChatSelectionHeader({
           {count}
         </Text>
       </View>
-      {includesMuted ? (
-        <Text
-          accessible
-          accessibilityLabel="Already muted — deselect it to mute the other chats"
-          numberOfLines={1}
-          style={[styles.selectionHint, { color: colors.mutedForeground }]}
-        >
-          Already muted — deselect it
-        </Text>
-      ) : (
-        <Pressable
-          onPress={onMute}
-          disabled={busy}
-          hitSlop={6}
-          accessibilityRole="button"
-          accessibilityLabel="Mute notifications"
-          style={({ pressed }) => [
-            styles.headerIconBtn,
-            { opacity: busy ? 0.5 : pressed ? 0.7 : 1 },
-          ]}
-        >
-          {busy ? (
-            <ActivityIndicator size="small" color={colors.foreground} />
-          ) : (
-            <Feather
-              name="bell-off"
-              size={20}
-              strokeWidth={2.25}
-              color={colors.foreground}
-            />
-          )}
-        </Pressable>
-      )}
+      <Pressable
+        onPress={onToggleMute}
+        disabled={busy}
+        hitSlop={6}
+        accessibilityRole="button"
+        accessibilityLabel={allMuted ? 'Unmute notifications' : 'Mute notifications'}
+        style={({ pressed }) => [
+          styles.headerIconBtn,
+          { opacity: busy ? 0.5 : pressed ? 0.7 : 1 },
+        ]}
+      >
+        {busy ? (
+          <ActivityIndicator size="small" color={colors.foreground} />
+        ) : (
+          <Feather
+            name={allMuted ? 'bell' : 'bell-off'}
+            size={20}
+            strokeWidth={2.25}
+            color={colors.foreground}
+          />
+        )}
+      </Pressable>
     </View>
   );
 }
@@ -201,10 +192,12 @@ export default function CommunitiesScreen() {
     () => communities.filter((c) => selectedIds.has(c.id)),
     [communities, selectedIds],
   );
-  // A chat that is already muted cannot be muted again, so one in the
-  // selection retires the toolbar's bell in favour of a hint.
-  const selectionIncludesMuted = selectedCommunities.some((c) =>
-    isCommunityMuted(c, nowMs),
+  // The toolbar's bell mirrors WhatsApp: it unmutes once the whole selection
+  // is already muted, and otherwise mutes whatever the selection has left
+  // unmuted. Already-muted chats keep their own duration.
+  const muteSelection = useMemo(
+    () => planSelectionMute(selectedCommunities, nowMs),
+    [selectedCommunities, nowMs],
   );
 
   const exitSelection = useCallback(() => {
@@ -340,8 +333,17 @@ export default function CommunitiesScreen() {
 
   const handleSelectionMute = useCallback(() => {
     if (muteBusy || selectedCommunities.length === 0) return;
+    if (muteSelection.unmute) {
+      // Every selected chat is muted — the toolbar's bell means unmute, and
+      // the sheet would only repeat that one action.
+      void applyMute(
+        selectedCommunities.map((community) => community.id),
+        'off',
+      );
+      return;
+    }
     setMuteSheetOpen(true);
-  }, [muteBusy, selectedCommunities.length]);
+  }, [muteBusy, selectedCommunities, muteSelection.unmute, applyMute]);
 
   const handleToastAction = useCallback(() => {
     const action = toast?.onAction;
@@ -487,10 +489,10 @@ export default function CommunitiesScreen() {
       {selectionActive ? (
         <ChatSelectionHeader
           count={selectedCommunities.length}
-          includesMuted={selectionIncludesMuted}
+          allMuted={muteSelection.unmute}
           busy={muteBusy}
           onClose={exitSelection}
-          onMute={handleSelectionMute}
+          onToggleMute={handleSelectionMute}
         />
       ) : (
         <AppHeader />
@@ -643,9 +645,11 @@ export default function CommunitiesScreen() {
         muteStateLabel={null}
         busy={muteBusy}
         onChoose={(duration) => {
-          if (selectedCommunities.length > 0) {
+          // Only the still-unmuted chats take the chosen duration; ones
+          // already muted keep their own mute (see planSelectionMute).
+          if (muteSelection.toMute.length > 0) {
             void applyMute(
-              selectedCommunities.map((community) => community.id),
+              muteSelection.toMute.map((community) => community.id),
               duration,
             );
           }
@@ -692,13 +696,6 @@ const styles = StyleSheet.create({
   selectionCount: {
     fontSize: 18,
     fontFamily: 'Geist_600SemiBold',
-  },
-  selectionHint: {
-    flexShrink: 1,
-    maxWidth: '60%',
-    fontSize: 12,
-    fontFamily: 'Geist_500Medium',
-    textAlign: 'right',
   },
 
   searchRow: {

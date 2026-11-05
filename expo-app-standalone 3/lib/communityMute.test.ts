@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { communityMuteLabel, isCommunityMuted } from './communityMute';
+import { communityMuteLabel, isCommunityMuted, planSelectionMute } from './communityMute';
 
 const NOW = Date.parse('2026-10-11T12:00:00Z');
 
@@ -80,4 +80,40 @@ test('the sheet label is null whenever the membership reads as unmuted', () => {
     communityMuteLabel({ notifications_muted_until: 'not-a-date' }, NOW),
     null,
   );
+});
+
+test('an all-muted selection turns the toolbar bell into unmute', () => {
+  const plan = planSelectionMute(
+    [
+      { id: 'a', notifications_muted: true },
+      { id: 'b', notifications_muted_until: '2026-10-11T20:00:00Z' },
+    ],
+    NOW,
+  );
+  assert.equal(plan.unmute, true);
+  assert.deepEqual(plan.toMute, []);
+});
+
+test('a mixed selection mutes only the chats that are still unmuted', () => {
+  const unmutedA = { id: 'a', notifications_muted: false };
+  const unmutedB = { id: 'b', notifications_muted: false };
+  const plan = planSelectionMute(
+    [{ id: 'c', notifications_muted: true }, unmutedA, unmutedB],
+    NOW,
+  );
+  assert.equal(plan.unmute, false);
+  assert.deepEqual(plan.toMute, [unmutedA, unmutedB]);
+});
+
+test('a lapsed timed mute counts as unmuted, so the selection can be muted again', () => {
+  const lapsed = { id: 'a', notifications_muted_until: '2026-10-11T11:00:00Z' };
+  const plan = planSelectionMute([lapsed], NOW);
+  assert.equal(plan.unmute, false);
+  assert.deepEqual(plan.toMute, [lapsed]);
+});
+
+test('an empty selection asks to mute, not unmute', () => {
+  const plan = planSelectionMute([]);
+  assert.equal(plan.unmute, false);
+  assert.deepEqual(plan.toMute, []);
 });
