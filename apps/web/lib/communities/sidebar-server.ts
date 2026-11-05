@@ -4,6 +4,7 @@ import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { getMasterImageMap, getMasterNameMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
 import { canStoreMuteUntil, canStoreShowcaseFlag } from "./showcase-flag";
 import { loadEventChatSidebarMeta } from "./event-chat";
+import { resolveCommunityImage } from "./dp";
 
 type ActivityRow = {
   community_id: string;
@@ -180,7 +181,9 @@ export async function getSidebarCommunities(userId: string) {
     const eventRoom = eventRooms.get(community.id);
     return {
       ...community,
-      image_url: images[community.id] ?? community.image_url ?? null,
+      // The mirrored column is written in the same request as the master row,
+      // so it is fresher than the hourly cached image map (see resolveCommunityImage).
+      image_url: resolveCommunityImage(community.image_url ?? null, images[community.id]),
       reference_name: names[community.id] ?? null,
       event_date: eventRoom?.eventDate ?? null,
       pinned_until: eventRoom?.pinnedUntil ?? null,

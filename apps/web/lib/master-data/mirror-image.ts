@@ -2,11 +2,11 @@
  * Keeps `communities.image_url` in step with the master-data row it mirrors.
  *
  * WHY THIS EXISTS
- *   An app-created community's display picture resolves from its master row —
- *   `resolveCommunityDp()` in lib/communities/dp.ts reads
- *   `communities.image_url` only as the fallback when the master row has none.
- *   The community column is therefore a MIRROR of the master row, not an
- *   independent picture: the admin community-DP route writes both rows, the
+ *   An app-created community's display picture resolves from its mirrored
+ *   `communities.image_url` (see `resolveCommunityImage()` in
+ *   lib/communities/dp.ts), with the master-data row as the fallback when the
+ *   copy is missing. The community column is therefore the freshest copy, not
+ *   an independent picture: the admin community-DP route writes both rows, the
  *   bulk "fetch images" tool deletes a replaced object only after checking the
  *   community column, and the orphan audit counts it as a live reference
  *   (see MASTER_IMAGE_LOOKUPS).
@@ -15,8 +15,8 @@
  *   community column kept whatever image the community was created with. That
  *   stale value was both wrong and sticky: the old object stayed referenced, so
  *   the orphan scan could never reclaim it, and every surface that painted the
- *   column (rather than resolving the master row) showed the pre-replacement
- *   picture.
+ *   column showed the pre-replacement picture after the cached master map
+ *   expired.
  *
  *   Failures here are logged, never thrown: the master row is already updated
  *   when a route calls this, so a mirror failure must not turn a successful
