@@ -38,7 +38,7 @@ import { useChatImeLayout } from '@/hooks/useChatImeLayout';
 import { useImageAspectRatio } from '@/hooks/useImageAspectRatio';
 import { cachedImageAspectRatio, rememberImageAspectRatio } from '@/lib/imageAspectRatio';
 import { hapticSelection, hapticToggle } from '@/lib/haptics';
-import { BooleanIntentCoalescer } from '@/lib/booleanIntentCoalescer';
+import { BooleanIntentCoalescer, retainPendingOverrides } from '@/lib/booleanIntentCoalescer';
 import {
   CommunityContent,
   CommunityEvent,
@@ -531,7 +531,13 @@ export function useContentActions(
   }, []);
 
   const reset = useCallback(() => {
-    setOverrides({});
+    // A fresh server snapshot must not erase a write that is still in flight:
+    // the snapshot predates it. Dropping the override there would flash the
+    // old like/count until the response lands.
+    const coalescers = coalescersRef.current;
+    setOverrides((current) =>
+      retainPendingOverrides(current, (key) => coalescers.get(key)?.isPending() ?? false),
+    );
     setPollOverrides({});
     setCommentCounts({});
   }, []);

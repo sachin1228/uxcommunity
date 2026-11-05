@@ -51,6 +51,9 @@ export function CommunityContentView({
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const query = useCommunityContent(communityId, kind, currentUserId);
+  const [editorVisible, setEditorVisible] = useState(false);
+  const [editing, setEditing] = useState<CommunityContent | null>(null);
+  const [selected, setSelected] = useState<CommunityContent | null>(null);
   // Confirmed card mutations (including the comment thread's absolute total)
   // are written into this tab's query cache, so a tab switch or remount inside
   // React Query's stale window still renders the post-mutation card.
@@ -60,13 +63,16 @@ export function CommunityContentView({
         communityContentKey(communityId, kind),
         (old = []) => old.map((entry) => (entry.id === item.id ? { ...entry, ...patch } : entry)),
       );
+      // The open detail holds a snapshot of the row from when it was tapped.
+      // Patch it too, or dropping the optimistic override later reverts its
+      // heart/count to the pre-mutation value.
+      setSelected((current) =>
+        current?.id === item.id ? ({ ...current, ...patch } as CommunityContent) : current,
+      );
     },
     [communityId, kind, queryClient],
   );
   const actions = useContentActions(writeThrough);
-  const [editorVisible, setEditorVisible] = useState(false);
-  const [editing, setEditing] = useState<CommunityContent | null>(null);
-  const [selected, setSelected] = useState<CommunityContent | null>(null);
   const { viewableStore, onViewableItemsChanged, viewabilityConfig } = useViewableKeys();
   // A new event arrives with its own group chat, and the creator is in it —
   // the notice says so before they go looking for the room.
