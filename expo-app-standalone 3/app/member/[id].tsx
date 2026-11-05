@@ -33,6 +33,7 @@ import { ContentCardRow } from '@/components/community/ContentCardRow';
 import { ContentReportModal } from '@/components/community/ContentReportModal';
 import { DOT_BAND_HEIGHT, DotField } from '@/components/profile/DotField';
 import { ProfileHeaderButton, ProfilePageHeader } from '@/components/profile/ProfilePageHeader';
+import { MemberOptionsSheet } from '@/components/profile/MemberOptionsSheet';
 import { MemberProfileHero } from '@/components/profile/MemberProfileHero';
 import { PhotoViewerModal } from '@/components/PhotoViewerModal';
 import { useAuth } from '@/context/AuthContext';
@@ -40,7 +41,7 @@ import { useColors } from '@/hooks/useColors';
 import { useViewableKeys } from '@/hooks/useViewableKeys';
 import type { CommunityContent } from '@/lib/communityContent';
 import { PENDING_DM_CONVERSATION_ID } from '@/lib/dm';
-import { unblockUser } from '@/lib/dmApi';
+import { blockUser, unblockUser } from '@/lib/dmApi';
 import { peekDmConversationForPeer } from '@/lib/dmConversationsCache';
 import {
   applyPollEventToFeed,
@@ -163,6 +164,8 @@ function MemberProfileSession({
   hasMoreRef.current = hasMore;
 
   const [messageError, setMessageError] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [blocking, setBlocking] = useState(false);
   const [unblocking, setUnblocking] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
@@ -437,8 +440,29 @@ function MemberProfileSession({
     });
   }, [member, memberId, router, viewerId]);
 
+  const handleBlock = useCallback(async () => {
+    if (blocking || !memberId) return;
+    setMenuOpen(false);
+    setBlocking(true);
+    setMessageError(null);
+    try {
+      await blockUser(memberId);
+      setMember((current) => {
+        const next = current ? { ...current, blockedByMe: true } : current;
+        memberRef.current = next;
+        return next;
+      });
+      if (viewerId) void invalidateScreenData(viewerId, memberFeedCacheKey(memberId));
+    } catch {
+      setMessageError('This member could not be blocked. Please try again.');
+    } finally {
+      setBlocking(false);
+    }
+  }, [blocking, memberId, viewerId]);
+
   const handleUnblock = useCallback(async () => {
     if (unblocking || !memberId) return;
+    setMenuOpen(false);
     setUnblocking(true);
     try {
       await unblockUser(memberId);
@@ -497,7 +521,6 @@ function MemberProfileSession({
         onPressAvatar={() => setPhotoOpen(true)}
         onMessage={() => void openMessage()}
         onUnblock={() => void handleUnblock()}
-        onReport={() => setReportOpen(true)}
         unblocking={unblocking}
         actionsDisabled={!memberAuthoritative}
       />
@@ -508,6 +531,21 @@ function MemberProfileSession({
         contentId={memberId ?? ''}
         onClose={() => setReportOpen(false)}
         onReported={() => setReportOpen(false)}
+      />
+
+      <MemberOptionsSheet
+        visible={menuOpen}
+        blockedByMe={member?.blockedByMe ?? false}
+        busy={blocking || unblocking}
+        onClose={() => setMenuOpen(false)}
+        onReport={() => {
+          setMenuOpen(false);
+          // Let the sheet finish dismissing before the report modal presents —
+          // iOS refuses a second presentation mid-dismissal.
+          setTimeout(() => setReportOpen(true), 240);
+        }}
+        onBlock={() => void handleBlock()}
+        onUnblock={() => void handleUnblock()}
       />
 
       {memberError && member ? (
@@ -534,6 +572,15 @@ function MemberProfileSession({
             onPress={() => router.back()}
             icon={<Ionicons name="arrow-back" size={22} color={colors.foreground} />}
           />
+        }
+        trailing={
+          memberAuthoritative && member && !member.blockedViewer ? (
+            <ProfileHeaderButton
+              label="Member options"
+              onPress={() => setMenuOpen(true)}
+              icon={<Feather name="more-vertical" size={20} color={colors.mutedForeground} />}
+            />
+          ) : undefined
         }
       />
 
