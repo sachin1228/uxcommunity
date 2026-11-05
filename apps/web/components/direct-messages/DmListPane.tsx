@@ -145,19 +145,16 @@ export const DmListPane = memo(function DmListPane({
               conversation.request_state === "pending" &&
               conversation.requested_by !== null &&
               conversation.requested_by !== currentUserId;
-            const hasPhoto =
-              Boolean(conversation.peer.avatar_url) &&
-              !isGeneratedProfilePicture(conversation.peer.avatar_url);
             return (
               // px-3/sm:px-4 — the brand's own inset (the topbar logo starts at
               // pl-3, then pl-4 from sm), so avatars, search field and chevron
               // share one left edge.
-              <div key={conversation.id} className="group relative">
+              <div key={conversation.id} className="relative">
                 <button
                   type="button"
                   onClick={() => onSelect(conversation.id)}
                   className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors sm:px-4 ${
-                    active ? "bg-surface-raised" : "group-hover:bg-surface-raised/60"
+                    active ? "bg-surface-raised" : "hover:bg-surface-raised/60"
                   }`}
                   aria-current={active ? "true" : undefined}
                 >
@@ -235,22 +232,22 @@ export const DmListPane = memo(function DmListPane({
                   </span>
                 </span>
                 </button>
-                {hasPhoto && (
-                  /* A hit area exactly over the face — the row button keeps
-                     the whole-row target; this opens the photo instead. */
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPhotoPeer({
-                        name: conversation.peer.name,
-                        avatarUrl: conversation.peer.avatar_url,
-                      })
-                    }
-                    className="absolute left-3 top-1/2 h-10 w-10 -translate-y-1/2 rounded-full transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:left-4"
-                    aria-label={`View ${conversation.peer.name}'s profile picture`}
-                    title="View photo"
-                  />
-                )}
+                {/* A hit area exactly over the face — the row button keeps
+                    the whole-row target; this opens the photo instead, even
+                    when it is the initials placeholder. The row does not
+                    light up for this press: only the face is the target. */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPhotoPeer({
+                      name: conversation.peer.name,
+                      avatarUrl: conversation.peer.avatar_url,
+                    })
+                  }
+                  className="absolute left-3 top-1/2 h-10 w-10 -translate-y-1/2 rounded-full transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:left-4"
+                  aria-label={`View ${conversation.peer.name}'s profile picture`}
+                  title="View photo"
+                />
               </div>
             );
           })
@@ -259,7 +256,11 @@ export const DmListPane = memo(function DmListPane({
 
       <PhotoViewer
         open={photoPeer !== null}
-        src={photoPeer?.avatarUrl ?? null}
+        src={
+          photoPeer?.avatarUrl && !isGeneratedProfilePicture(photoPeer.avatarUrl)
+            ? photoPeer.avatarUrl
+            : null
+        }
         name={photoPeer?.name ?? ""}
         subtitle="Profile picture"
         onClose={() => setPhotoPeer(null)}

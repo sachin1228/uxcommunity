@@ -1491,13 +1491,10 @@ export default function DmThreadScreen() {
         <View style={styles.headerPeer}>
           <Pressable
             onPress={() => setPhotoOpen(true)}
-            disabled={!peerPhoto}
-            accessibilityRole={peerPhoto ? 'button' : undefined}
-            accessibilityLabel={peerPhoto ? `View ${displayPeerName} photo` : undefined}
+            accessibilityRole="button"
+            accessibilityLabel={`View ${displayPeerName} photo`}
             hitSlop={4}
-            style={({ pressed }) =>
-              pressed && peerPhoto ? styles.headerAvatarPressed : null
-            }
+            style={({ pressed }) => (pressed ? styles.headerAvatarPressed : null)}
           >
             <PersonAvatar name={displayPeerName} url={displayPeerAvatar} size={36} />
           </Pressable>
@@ -1860,6 +1857,7 @@ export default function DmThreadScreen() {
       <PhotoViewerModal
         visible={photoOpen}
         uri={peerPhoto}
+        name={displayPeerName}
         title="Profile picture"
         onClose={() => setPhotoOpen(false)}
       />

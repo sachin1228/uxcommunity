@@ -474,8 +474,8 @@ function MemberProfileSession({
 
   const body = member?.profile;
   const identityName = member?.user?.name ?? 'Member';
-  // Only a real stored picture opens the viewer — a member without one keeps
-  // the plain initials, which have nothing to show full screen.
+  // Only a real stored picture skips the initials; either way the face opens
+  // the viewer, with the initials drawn at full size when there is none.
   const memberPhoto = resolveProfilePictureUri(body?.avatar_url);
 
   const header = (
@@ -494,7 +494,7 @@ function MemberProfileSession({
         linkedinUrl={body?.linkedin_url ?? ''}
         portfolioUrl={body?.portfolio_url ?? ''}
         blockedByMe={member?.blockedByMe ?? false}
-        onPressAvatar={memberPhoto ? () => setPhotoOpen(true) : undefined}
+        onPressAvatar={() => setPhotoOpen(true)}
         onMessage={() => void openMessage()}
         onUnblock={() => void handleUnblock()}
         onReport={() => setReportOpen(true)}
@@ -651,6 +651,7 @@ function MemberProfileSession({
       <PhotoViewerModal
         visible={photoOpen}
         uri={memberPhoto}
+        name={identityName}
         title="Profile picture"
         onClose={() => setPhotoOpen(false)}
       />

@@ -209,7 +209,7 @@ export function ProfileCard({
                 className="h-full w-full object-cover"
               />
             </button>
-          ) : onOpenAvatarPicker ? (
+          ) : (
             <button
               type="button"
               onClick={() => setPhotoOpen(true)}
@@ -219,8 +219,6 @@ export function ProfileCard({
             >
               <AvatarImg url={avatarUrl} name={name} size={96} className="h-24 w-24 shadow-lg" />
             </button>
-          ) : (
-            <AvatarImg url={avatarUrl} name={name} size={96} className="h-24 w-24 shadow-lg" />
           )}
         </div>
 

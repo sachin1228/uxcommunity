@@ -396,6 +396,7 @@ export default function MessagesScreen() {
       <PhotoViewerModal
         visible={photoPeer !== null}
         uri={photoPeer ? resolveProfilePictureUri(photoPeer.avatar_url) : null}
+        name={photoPeer?.name}
         title="Profile picture"
         onClose={() => setPhotoPeer(null)}
       />
@@ -418,14 +419,13 @@ function ConversationRow({
   onPressAvatar?: () => void;
 }) {
   const colors = useColors();
-  // Two press targets share one pressed tint, so the row still reads as a
-  // single surface: the face (photo) and the conversation beside it.
+  // The row tint belongs to the conversation target; the face dims on its
+  // own instead, so pressing the photo never looks like pressing the row.
   const [rowPressed, setRowPressed] = useState(false);
 
   const preview = dmConversationPreview(conversation, userId);
   const incoming = isIncomingRequest(conversation, userId);
-  const peerPhoto = resolveProfilePictureUri(conversation.peer.avatar_url);
-  const canViewPhoto = Boolean(onPressAvatar && peerPhoto);
+  const canViewPhoto = Boolean(onPressAvatar);
 
   return (
     <View
@@ -436,8 +436,6 @@ function ConversationRow({
     >
       <Pressable
         onPress={canViewPhoto ? onPressAvatar : onPress}
-        onPressIn={() => setRowPressed(true)}
-        onPressOut={() => setRowPressed(false)}
         hitSlop={canViewPhoto ? 4 : undefined}
         accessible={canViewPhoto}
         accessibilityRole={canViewPhoto ? 'button' : undefined}

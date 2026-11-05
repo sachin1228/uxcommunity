@@ -196,16 +196,15 @@ export function DmThread({
               {peer.name}
             </span>
           </Link>
-          {hasPhoto && (
-            /* The face opens the photo; the name still opens the profile. */
-            <button
-              type="button"
-              onClick={() => setPhotoOpen(true)}
-              className="absolute left-1 top-1/2 h-9 w-9 -translate-y-1/2 rounded-full transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              aria-label={`View ${peer.name}'s profile picture`}
-              title="View photo"
-            />
-          )}
+          {/* The face opens the photo (initials included); the name still
+              opens the profile. */}
+          <button
+            type="button"
+            onClick={() => setPhotoOpen(true)}
+            className="absolute left-1 top-1/2 h-9 w-9 -translate-y-1/2 rounded-full transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            aria-label={`View ${peer.name}'s profile picture`}
+            title="View photo"
+          />
         </div>
 
         <button

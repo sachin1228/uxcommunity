@@ -236,14 +236,11 @@ export function CommunityRow({
     >
       {/* Avatar — start aligned. With a picture it opens the photo full screen
           instead of the chat; without one it keeps opening the chat, exactly
-          as the whole row always did. */}
+          as the whole row always did. Pressing the face does not tint the
+          row: the tint is the row's own press feedback. */}
       <Pressable
         onPress={canViewPhoto ? onPressAvatar : onPress}
-        onPressIn={() => {
-          setRowPressed(true);
-          onPressIn?.();
-        }}
-        onPressOut={() => setRowPressed(false)}
+        onPressIn={onPressIn}
         hitSlop={canViewPhoto ? 6 : undefined}
         accessible={canViewPhoto}
         accessibilityRole={canViewPhoto ? 'button' : undefined}
