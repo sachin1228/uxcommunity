@@ -209,6 +209,16 @@ export function ProfileCard({
                 className="h-full w-full object-cover"
               />
             </button>
+          ) : onOpenAvatarPicker ? (
+            <button
+              type="button"
+              onClick={() => setPhotoOpen(true)}
+              aria-label={`View ${name}'s profile picture`}
+              title="View photo"
+              className="block rounded-full transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+              <AvatarImg url={avatarUrl} name={name} size={96} className="h-24 w-24 shadow-lg" />
+            </button>
           ) : (
             <AvatarImg url={avatarUrl} name={name} size={96} className="h-24 w-24 shadow-lg" />
           )}
@@ -499,7 +509,7 @@ export function ProfileCard({
 
         <PhotoViewer
           open={photoOpen}
-          src={avatarUrl}
+          src={hasPicture ? avatarUrl : null}
           name={name}
           subtitle="Profile picture"
           onEdit={

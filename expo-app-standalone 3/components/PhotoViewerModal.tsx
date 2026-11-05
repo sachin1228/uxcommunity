@@ -1,17 +1,31 @@
 import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { avatarBackground, nameInitials } from '@/lib/avatar';
 import { mediaCachePolicy, mediaSource } from '@/lib/privateMedia';
 
 interface Props {
   visible: boolean;
-  /** The photo itself; the viewer stays closed while this is empty. */
+  /** The photo itself. Empty renders the enlarged initials instead. */
   uri: string | null;
   /** The bar's title — "Profile picture" / "Community photo". */
   title?: string;
+  /**
+   * The member the picture belongs to. Supplying it lets the viewer open with
+   * initials when there is no photo yet (your own profile), so the header's
+   * edit action is still the way to set one.
+   */
+  name?: string;
   /**
    * The owner's own picture only: opens the change-photo flow. The pencil
    * lives here rather than over the avatar, the way a chat app's full-screen
@@ -25,20 +39,24 @@ interface Props {
  * The full-screen display-picture viewer: the photo alone, centred on a black
  * canvas, with the title and a way back above it. A click on a community's
  * face or a member's picture opens it; on the owner's own picture the pencil
- * in the bar is the way to change it.
+ * in the bar is the way to change it. With no picture yet it shows the same
+ * initials the profile does, enlarged, so the pencil is still one tap away.
  */
 export function PhotoViewerModal({
   visible,
   uri,
   title = 'Profile picture',
+  name,
   onEdit,
   onClose,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const fallbackSize = Math.min(260, Math.round(width * 0.58));
 
   return (
     <Modal
-      visible={visible && Boolean(uri)}
+      visible={visible && Boolean(uri || name)}
       animationType="fade"
       presentationStyle="fullScreen"
       statusBarTranslucent
@@ -86,7 +104,28 @@ export function PhotoViewerModal({
               cachePolicy={mediaCachePolicy(uri)}
               accessibilityLabel={title}
             />
-          ) : null}
+          ) : (
+            <View
+              accessible
+              accessibilityRole="image"
+              accessibilityLabel={`${name ?? 'Your'} profile picture placeholder`}
+              style={[
+                styles.fallback,
+                {
+                  width: fallbackSize,
+                  height: fallbackSize,
+                  borderRadius: fallbackSize / 2,
+                  backgroundColor: avatarBackground(name),
+                },
+              ]}
+            >
+              <Text
+                style={[styles.fallbackText, { fontSize: Math.round(fallbackSize * 0.38) }]}
+              >
+                {nameInitials(name)}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
     </Modal>
@@ -120,4 +159,6 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 0 },
   canvas: { flex: 1, minHeight: 0, alignItems: 'center', justifyContent: 'center' },
   image: { width: '100%', height: '100%' },
+  fallback: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  fallbackText: { color: '#FFFFFF', fontFamily: 'Geist_600SemiBold' },
 });

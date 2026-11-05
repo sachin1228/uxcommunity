@@ -2,11 +2,16 @@
 
 import { useEffect, useRef } from "react";
 import { Camera, X } from "lucide-react";
+import { avatarBackground, nameInitials } from "@/lib/avatar";
 import { ModalPortal } from "./Modal";
 
 interface PhotoViewerProps {
   open: boolean;
-  /** The photo to show; nothing renders while this is empty. */
+  /**
+   * The photo to show. Empty renders the member's initials, enlarged — the
+   * same placeholder their profile wears — so your own empty picture still
+   * opens with the edit action in the bar.
+   */
   src: string | null | undefined;
   /** The community or member the photo belongs to. */
   name: string;
@@ -64,7 +69,7 @@ export function PhotoViewer({
     };
   }, [open, onClose]);
 
-  if (!open || !src) return null;
+  if (!open) return null;
 
   return (
     <ModalPortal>
@@ -111,14 +116,29 @@ export function PhotoViewer({
           className="relative flex min-h-0 flex-1 items-center justify-center p-4 sm:p-8"
           onClick={onClose}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={src}
-            alt={`${name} photo`}
-            className="h-full w-full select-none object-contain drop-shadow-2xl"
-            draggable={false}
-            onClick={(event) => event.stopPropagation()}
-          />
+          {src ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={src}
+              alt={`${name} photo`}
+              className="h-full w-full select-none object-contain drop-shadow-2xl"
+              draggable={false}
+              onClick={(event) => event.stopPropagation()}
+            />
+          ) : (
+            <div
+              role="img"
+              aria-label={`${name} has no profile picture`}
+              className="flex h-60 w-60 select-none items-center justify-center overflow-hidden rounded-full font-body font-semibold text-white drop-shadow-2xl"
+              style={{
+                backgroundColor: avatarBackground(name),
+                fontSize: 88,
+              }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              {nameInitials(name)}
+            </div>
+          )}
         </div>
       </div>
     </ModalPortal>

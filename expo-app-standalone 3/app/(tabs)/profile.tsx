@@ -658,10 +658,7 @@ function ProfileTabSession({
         company={profile?.company ?? null}
         linkedinUrl={body?.linkedin_url ?? ''}
         portfolioUrl={body?.portfolio_url ?? ''}
-        onPressAvatar={() => {
-          if (ownPhoto) setPhotoOpen(true);
-          else void handleChangePicture();
-        }}
+        onPressAvatar={() => setPhotoOpen(true)}
         onEditAvatar={() => void handleChangePicture()}
         onAddLinkedIn={() => setLinkModal('linkedin')}
         onAddPortfolio={() => setLinkModal('portfolio')}
@@ -820,6 +817,7 @@ function ProfileTabSession({
       <PhotoViewerModal
         visible={photoOpen}
         uri={ownPhoto}
+        name={profile?.user?.name ?? user?.name ?? ''}
         title="Profile picture"
         onEdit={() => {
           setPhotoOpen(false);
