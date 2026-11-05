@@ -512,10 +512,7 @@ export function ProfileCard({
           subtitle="Profile picture"
           onEdit={
             onOpenAvatarPicker
-              ? () => {
-                  setPhotoOpen(false);
-                  onOpenAvatarPicker();
-                }
+              ? () => onOpenAvatarPicker()
               : undefined
           }
           onClose={() => setPhotoOpen(false)}

@@ -819,10 +819,9 @@ function ProfileTabSession({
         uri={ownPhoto}
         name={profile?.user?.name ?? user?.name ?? ''}
         title="Profile picture"
-        onEdit={() => {
-          setPhotoOpen(false);
-          void handleChangePicture();
-        }}
+        // Keep the viewer open behind the picker: the picture updates in
+        // place when the new one is saved, and cancelling returns to it.
+        onEdit={() => void handleChangePicture()}
         onClose={() => setPhotoOpen(false)}
       />
 
