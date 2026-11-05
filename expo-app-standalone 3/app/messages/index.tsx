@@ -26,7 +26,9 @@ import { DmIcon } from '@/components/DmIcon';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
+import { clearDmUnreadLocally } from '@/hooks/useDmUnread';
 import { useDmTyping } from '@/hooks/useDmTyping';
+import { recordDmReadFloor } from '@/lib/dmReadFloor';
 import { realtimeClient, realtimeRooms } from '@/lib/realtime';
 import {
   loadDmConversations,
@@ -246,6 +248,19 @@ export default function MessagesScreen() {
 
   const openThread = useCallback(
     (conversation: DmConversation) => {
+      // Clear the row and the badge before navigating, like the community
+      // list: waiting for the read PATCH left the count visible whenever the
+      // member came straight back. The floor keeps the returning refetch from
+      // resurrecting a payload produced before the marker advanced.
+      recordDmReadFloor(conversation.id, conversation.last_message_at);
+      if (conversation.unread_count > 0) {
+        setConversations((prev) =>
+          prev.map((row) =>
+            row.id === conversation.id ? { ...row, unread_count: 0 } : row,
+          ),
+        );
+        clearDmUnreadLocally(conversation.id, true);
+      }
       router.push({
         pathname: '/messages/[id]',
         params: {

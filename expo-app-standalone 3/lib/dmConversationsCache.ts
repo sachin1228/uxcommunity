@@ -19,6 +19,7 @@
 import type { DmConversation } from './dm';
 import { getDmConversations } from './dmApi';
 import { createDmConversationsCache } from './dmConversationsCacheCore';
+import { applyDmReadFloor } from './dmReadFloor';
 
 export {
   createDmConversationsCache,
@@ -36,11 +37,13 @@ export function setDmConversationsActiveUser(userId: string | null): void {
 }
 
 export function peekDmConversations(): DmConversation[] | null {
-  return dmConversations.peek();
+  const rows = dmConversations.peek();
+  return rows ? rows.map(applyDmReadFloor) : null;
 }
 
 export function peekDmConversation(conversationId: string): DmConversation | null {
-  return dmConversations.peekOne(conversationId);
+  const row = dmConversations.peekOne(conversationId);
+  return row ? applyDmReadFloor(row) : null;
 }
 
 /**
@@ -48,7 +51,8 @@ export function peekDmConversation(conversationId: string): DmConversation | nul
  * can push the thread with this id and skip the create-or-get round trip.
  */
 export function peekDmConversationForPeer(peerId: string): DmConversation | null {
-  return dmConversations.peekOneForPeer(peerId);
+  const row = dmConversations.peekOneForPeer(peerId);
+  return row ? applyDmReadFloor(row) : null;
 }
 
 /** Keep the shared copy in step with a screen's live conversation state. */
@@ -71,5 +75,5 @@ export function clearDmConversationsCache(): void {
 export function loadDmConversations(
   options: { fresh?: boolean } = {},
 ): Promise<DmConversation[]> {
-  return dmConversations.load(options);
+  return dmConversations.load(options).then((rows) => rows.map(applyDmReadFloor));
 }

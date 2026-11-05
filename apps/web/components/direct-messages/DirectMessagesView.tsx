@@ -419,27 +419,44 @@ export function DirectMessagesView({
   // this open has acknowledged so a stale payload cannot bring the count back,
   // and the cached list is patched so a refetch inside the stale window
   // doesn't replay the pre-read payload either.
-  useEffect(() => {
-    if (!activeId) return;
-    const opened = conversationsRef.current?.find((c) => c.id === activeId);
-    if (opened?.last_message_at) recordReadFloor(activeId, opened.last_message_at);
+  //
+  // The topbar badge is a conversation count, so this conversation's row
+  // contributes exactly one; decrementing its cache entry makes the icon
+  // clear with the row instead of after the PATCH acknowledgement.
+  const clearUnreadOnOpen = useCallback(
+    (conversationId: string) => {
+      const opened = conversationsRef.current?.find((c) => c.id === conversationId);
+      if (opened?.last_message_at) recordReadFloor(conversationId, opened.last_message_at);
+      if (opened && opened.unread_count > 0) {
+        patchCachedRequest<{ count: number }>(
+          dmUrls.unread,
+          (current) => ({ count: Math.max(0, (current?.count ?? 0) - 1) }),
+          userId,
+        );
+      }
 
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === activeId && c.unread_count !== 0 ? { ...c, unread_count: 0 } : c,
-      ),
-    );
-    patchCachedRequest<{ conversations?: DmConversationSummary[] }>(
-      dmUrls.conversations,
-      (current) => ({
-        ...current,
-        conversations: (current?.conversations ?? []).map((c) =>
-          c.id === activeId ? { ...c, unread_count: 0 } : c,
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === conversationId && c.unread_count !== 0 ? { ...c, unread_count: 0 } : c,
         ),
-      }),
-      userId,
-    );
-  }, [activeId, setConversations, userId]);
+      );
+      patchCachedRequest<{ conversations?: DmConversationSummary[] }>(
+        dmUrls.conversations,
+        (current) => ({
+          ...current,
+          conversations: (current?.conversations ?? []).map((c) =>
+            c.id === conversationId ? { ...c, unread_count: 0 } : c,
+          ),
+        }),
+        userId,
+      );
+    },
+    [setConversations, userId],
+  );
+
+  useEffect(() => {
+    if (activeId) clearUnreadOnOpen(activeId);
+  }, [activeId, clearUnreadOnOpen]);
 
   // Report the conversation read once its messages are on screen — up to the
   // newest DISPLAYED message, because "now" could swallow one that raced the
@@ -514,6 +531,9 @@ export function DirectMessagesView({
     // same conversation returned early on the previous session's watermark, so
     // a read PATCH that failed (or was cut off) was never retried.
     markedThroughRef.current = { conversationId: null, through: 0 };
+    // Clear in the click itself, not one effect later: coming straight back
+    // to the list must never show the count the member just consumed.
+    clearUnreadOnOpen(conversationId);
     setActiveId(conversationId);
     setActionError(null);
     // Seed the fallback copy with what the list knows: once a refetch drops
@@ -526,7 +546,7 @@ export function DirectMessagesView({
       return prev && prev.id === conversationId ? prev : null;
     });
     setLightboxIndex(null);
-  }, []);
+  }, [clearUnreadOnOpen]);
 
   // Leaving the thread drops it and any lifecycle error that belonged to it.
   const closeConversation = useCallback(() => {

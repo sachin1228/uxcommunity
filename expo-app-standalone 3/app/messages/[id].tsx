@@ -54,6 +54,7 @@ import { useDmTyping } from '@/hooks/useDmTyping';
 import { chatCache } from '@/lib/chatCacheStore';
 import { peekDmMessages, rememberDmMessages } from '@/lib/dmMessageStore';
 import { takePrefetchedDmMessages } from '@/lib/dmMessagePrefetch';
+import { recordDmReadFloor } from '@/lib/dmReadFloor';
 import {
   answerDmRequest,
   blockUser,
@@ -532,7 +533,7 @@ export default function DmThreadScreen() {
        */
       const applyUnreadBoundary = (row: DmConversation | null) => {
         setInitialUnread(null);
-        if (!row || row.unread_count <= 0) return;
+        if (!row) return;
         const readThrough = readThroughRef.current;
         const boundary =
           !row.my_last_read_at
@@ -542,14 +543,18 @@ export default function DmThreadScreen() {
               : Date.parse(readThrough) > Date.parse(row.my_last_read_at)
                 ? readThrough
                 : row.my_last_read_at;
-        const firstUnread = page.messages.find(
+        const unread = page.messages.filter(
           (message) =>
             message.user_id === row.peer.id &&
             (!boundary || message.created_at > boundary),
         );
-        if (firstUnread) {
-          setInitialUnread({ id: firstUnread.id, count: row.unread_count });
-        }
+        if (unread.length === 0) return;
+        // The row's count may already be zeroed by the tap (or the floor);
+        // the divider still describes what was unread at open.
+        setInitialUnread({
+          id: unread[0].id,
+          count: row.unread_count > 0 ? row.unread_count : unread.length,
+        });
       };
 
       // Messages paint first; the list projection only decides the footer and
@@ -692,6 +697,9 @@ export default function DmThreadScreen() {
           void markDmRead(conversationId, messageId)
             .then(() => {
               readFailedRef.current = false;
+              // Cover messages that arrived while this thread was open: the
+              // list refetch can otherwise replay a pre-read count for them.
+              recordDmReadFloor(conversationId, messageId);
               signalDmListChanged();
             })
             .catch(() => {
