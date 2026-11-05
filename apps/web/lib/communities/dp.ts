@@ -19,9 +19,34 @@ export interface CommunityDpData {
 }
 
 /**
- * Resolves a community's display picture the same way the app resolves
- * images everywhere: the master-data row (via reference_id) wins, with the
- * stored communities column as fallback.
+ * Picks the picture an app-created community shows: its mirrored copy first,
+ * the master-data value only when no copy exists.
+ *
+ * WHY THIS ORDER
+ *   Every master image write mirrors the new URL onto the linked community
+ *   rows in the SAME request (lib/master-data/mirror-image.ts), so the stored
+ *   column is never older than the master row. The master map, by contrast, is
+ *   served from a 1-hour `unstable_cache` entry, and its `revalidateTag` is a
+ *   no-op on the Worker (OpenNext's tag cache defaults to `dummy`). Preferring
+ *   the map therefore hid a freshly fetched or replaced city picture on every
+ *   resolved surface — admin communities, the sidebar, chat headers, previews
+ *   — until the entry expired. The mirrored column is the fresh copy; the map
+ *   stays as the fallback for rows that predate the mirror (or whose mirror
+ *   write failed).
+ */
+export function resolveCommunityImage(
+  stored: string | null,
+  master: string | null | undefined,
+): string | null {
+  return stored ?? master ?? null;
+}
+
+/**
+ * Resolves a community's display picture.
+ *
+ * The stored column wins; the master-data map (via reference_id) is the
+ * fallback when the mirror has no value yet. See `resolveCommunityImage` for
+ * why this order is the correct one on the deployed Worker.
  */
 export async function resolveCommunityDp(input: {
   type: string;
@@ -30,13 +55,11 @@ export async function resolveCommunityDp(input: {
   lottie_url?: string | null;
   lottie_format?: string | null;
 }): Promise<CommunityDpData> {
-  let image_url = input.image_url ?? null;
+  if (input.image_url) return { image_url: input.image_url };
 
   const hasMasterData = Boolean(TABLE_LOOKUP[input.type]);
-  if (hasMasterData && input.reference_id) {
-    const imageMap = await getMasterImageMap(input.type);
-    image_url = imageMap[input.reference_id] ?? image_url;
-  }
+  if (!hasMasterData || !input.reference_id) return { image_url: null };
 
-  return { image_url };
+  const imageMap = await getMasterImageMap(input.type);
+  return { image_url: imageMap[input.reference_id] ?? null };
 }

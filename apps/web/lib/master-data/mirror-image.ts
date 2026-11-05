@@ -2,11 +2,11 @@
  * Keeps `communities.image_url` in step with the master-data row it mirrors.
  *
  * WHY THIS EXISTS
- *   An app-created community's display picture resolves from its master row —
- *   `resolveCommunityDp()` in lib/communities/dp.ts reads
- *   `communities.image_url` only as the fallback when the master row has none.
- *   The community column is therefore a MIRROR of the master row, not an
- *   independent picture: the admin community-DP route writes both rows, the
+ *   An app-created community's display picture resolves from its mirrored
+ *   `communities.image_url` (see `resolveCommunityImage()` in
+ *   lib/communities/dp.ts), with the master-data row as the fallback when the
+ *   copy is missing. The community column is therefore the freshest copy, not
+ *   an independent picture: the admin community-DP route writes both rows, the
  *   bulk "fetch images" tool deletes a replaced object only after checking the
  *   community column, and the orphan audit counts it as a live reference
  *   (see MASTER_IMAGE_LOOKUPS).
@@ -15,8 +15,8 @@
  *   community column kept whatever image the community was created with. That
  *   stale value was both wrong and sticky: the old object stayed referenced, so
  *   the orphan scan could never reclaim it, and every surface that painted the
- *   column (rather than resolving the master row) showed the pre-replacement
- *   picture.
+ *   column showed the pre-replacement picture after the cached master map
+ *   expired.
  *
  *   Failures here are logged, never thrown: the master row is already updated
  *   when a route calls this, so a mirror failure must not turn a successful
@@ -41,6 +41,64 @@ export const COMMUNITY_TYPE_BY_MASTER_TABLE = {
   experience_levels: "experience_level",
   job_titles: "job_title",
 } as const satisfies Record<MasterTable, string>;
+
+/**
+ * The reverse of COMMUNITY_TYPE_BY_MASTER_TABLE: the master table an
+ * app-created community mirrors. Kept beside it so the two directions cannot
+ * drift apart.
+ */
+export const MASTER_TABLE_BY_COMMUNITY_TYPE = {
+  city: "cities",
+  sector: "design_sectors",
+  experience_level: "experience_levels",
+  job_title: "job_titles",
+} as const satisfies Record<string, MasterTable>;
+
+/**
+ * The other direction: an app-created community's new picture becomes its
+ * master row's picture too.
+ *
+ * The in-app community settings (owner or an appointed admin) write the
+ * community column alone, while feeds, the library and Explore read the master
+ * row. Without this write-through an uploaded community DP showed in the chat
+ * list/header yet kept the replaced city picture on those cards. Removal is
+ * deliberately not mirrored: clearing the community copy should fall back to
+ * the city picture everywhere, not erase it.
+ *
+ * Best-effort like the forward mirror: a failed master write is logged, never
+ * thrown, and the community column still carries the new picture.
+ */
+export async function mirrorCommunityImageToMaster({
+  db,
+  type,
+  referenceId,
+  imageUrl,
+}: {
+  db: DbClient;
+  type: string;
+  referenceId: string | null;
+  imageUrl: string;
+}): Promise<boolean> {
+  const table = MASTER_TABLE_BY_COMMUNITY_TYPE[type as keyof typeof MASTER_TABLE_BY_COMMUNITY_TYPE];
+  if (!table || !referenceId) return false;
+
+  // The table name is constrained by MASTER_TABLE_BY_COMMUNITY_TYPE; the cast
+  // matches the untyped dynamic lookups used by the admin routes.
+  const { error } = await db
+    .from(table as any)
+    .update({ image_url: imageUrl })
+    .eq("id", referenceId);
+
+  if (error) {
+    console.error("[master-data] community image mirror failed", {
+      type,
+      referenceId,
+      error,
+    });
+    return false;
+  }
+  return true;
+}
 
 export interface MasterImageSyncResult {
   /** communities rows whose `image_url` was written — all get the same value. */

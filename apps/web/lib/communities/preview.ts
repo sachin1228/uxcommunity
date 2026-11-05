@@ -72,9 +72,9 @@ export async function loadCommunityPreview(
       },
       userId,
     ),
-    // The DP resolves like every other community surface: official
-    // (profile-derived) communities take the live master-data row's current
-    // picture via reference_id, with the stored communities column as fallback.
+    // The DP resolves like every other community surface: the mirrored
+    // community column wins (it is written in the same request as the master
+    // row), with the master-data row via reference_id as the fallback.
     resolveCommunityDp({
       type: row.type,
       reference_id: row.reference_id,
