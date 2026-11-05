@@ -15,6 +15,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { AvatarPickerModal } from '@/components/profile/AvatarPickerModal';
+import { PhotoViewerModal } from '@/components/PhotoViewerModal';
 import { AddLinkModal } from '@/components/profile/AddLinkModal';
 import { DOT_BAND_HEIGHT, DotField } from '@/components/profile/DotField';
 import { ProfileHeaderButton, ProfilePageHeader } from '@/components/profile/ProfilePageHeader';
@@ -46,6 +47,7 @@ import { getProfileFeed, type ProfileFeedScope } from '@/lib/profileFeed';
 import { useThreadPollRealtime } from '@/hooks/useThreadPollRealtime';
 import { hapticSelection } from '@/lib/haptics';
 import { getOwnProfile, uploadAvatar, type OwnProfile } from '@/lib/profile';
+import { resolveProfilePictureUri } from '@/lib/profilePicture';
 import { prepareImageForUpload, type PreparedImage } from '@/lib/prepareImage';
 import {
   fetchScreenData,
@@ -179,6 +181,7 @@ function ProfileTabSession({
   const [avatarPick, setAvatarPick] = useState<PreparedImage | null>(null);
   const [avatarSaving, setAvatarSaving] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [photoOpen, setPhotoOpen] = useState(false);
   const [linkModal, setLinkModal] = useState<'linkedin' | 'portfolio' | null>(null);
   const [companyModalOpen, setCompanyModalOpen] = useState(false);
 
@@ -632,6 +635,12 @@ function ProfileTabSession({
   );
 
   const body = profile?.profile;
+  // The session already carries the member's picture, so the hero shows the
+  // real DP from the first frame instead of a flash of initials while
+  // GET /api/profile is in flight.
+  const ownAvatarUrl = body?.avatar_url ?? user?.avatar_url ?? null;
+  // Initials have nothing to show full screen — those keep the direct picker.
+  const ownPhoto = resolveProfilePictureUri(ownAvatarUrl);
   const hero = (
     <View style={styles.heroWrap}>
       {/* Full-bleed dotted backdrop — the web profile's texture, anchored to
@@ -642,17 +651,18 @@ function ProfileTabSession({
 
       <ProfileHero
         name={profile?.user?.name ?? user?.name ?? ''}
-        // The session already carries the member's picture, so the hero shows
-        // the real DP from the first frame instead of a flash of initials
-        // while GET /api/profile is in flight.
-        avatarUrl={body?.avatar_url ?? user?.avatar_url ?? null}
+        avatarUrl={ownAvatarUrl}
         city={body?.cities?.name ?? null}
         roleLabel={profile?.roleLabel ?? null}
         bio={body?.bio ?? ''}
         company={profile?.company ?? null}
         linkedinUrl={body?.linkedin_url ?? ''}
         portfolioUrl={body?.portfolio_url ?? ''}
-        onPressAvatar={() => void handleChangePicture()}
+        onPressAvatar={() => {
+          if (ownPhoto) setPhotoOpen(true);
+          else void handleChangePicture();
+        }}
+        onEditAvatar={() => void handleChangePicture()}
         onAddLinkedIn={() => setLinkModal('linkedin')}
         onAddPortfolio={() => setLinkModal('portfolio')}
         onAddCompany={() => setCompanyModalOpen(true)}
@@ -805,6 +815,17 @@ function ProfileTabSession({
         item={editing}
         onClose={() => setEditing(null)}
         onSaved={replaceItem}
+      />
+
+      <PhotoViewerModal
+        visible={photoOpen}
+        uri={ownPhoto}
+        title="Profile picture"
+        onEdit={() => {
+          setPhotoOpen(false);
+          void handleChangePicture();
+        }}
+        onClose={() => setPhotoOpen(false)}
       />
 
       <AvatarPickerModal

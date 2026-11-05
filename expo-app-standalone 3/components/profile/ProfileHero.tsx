@@ -27,7 +27,10 @@ interface Props {
   company: ProfileCompany | null;
   linkedinUrl: string;
   portfolioUrl: string;
+  /** Opens the photo full screen (or the picker when there is no photo yet). */
   onPressAvatar: () => void;
+  /** The camera badge — straight to the change-photo flow. */
+  onEditAvatar?: () => void;
   onAddLinkedIn: () => void;
   onAddPortfolio: () => void;
   /** Opens the "Where do you work?" picker. Omitted to hide the pill. */
@@ -57,6 +60,7 @@ export function ProfileHero({
   linkedinUrl,
   portfolioUrl,
   onPressAvatar,
+  onEditAvatar,
   onAddLinkedIn,
   onAddPortfolio,
   onAddCompany,
@@ -68,28 +72,41 @@ export function ProfileHero({
 
   return (
     <View style={styles.root}>
-      {/* ── Display picture — tap to change it ── */}
-      <Pressable
-        onPress={onPressAvatar}
-        accessibilityRole="button"
-        accessibilityLabel="Change profile picture"
-        style={styles.avatarWrap}
-      >
-        <PersonAvatar
-          name={name}
-          url={avatarUrl}
-          size={96}
-          style={{ borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}
-        />
-        <View
-          style={[
-            styles.cameraBadge,
-            { backgroundColor: colors.background, borderColor: colors.border },
-          ]}
+      {/* ── Display picture — tap to view it full screen; the camera badge
+          and the viewer's pencil both lead to the change-photo flow ── */}
+      <View style={styles.avatarWrap}>
+        <Pressable
+          onPress={onPressAvatar}
+          accessibilityRole="button"
+          accessibilityLabel="View profile picture"
+          style={({ pressed }) => (pressed ? styles.avatarPressed : null)}
         >
-          <Feather name="camera" size={13} color={colors.foregroundMuted} />
-        </View>
-      </Pressable>
+          <PersonAvatar
+            name={name}
+            url={avatarUrl}
+            size={96}
+            style={{ borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}
+          />
+        </Pressable>
+        {onEditAvatar ? (
+          <Pressable
+            onPress={onEditAvatar}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Change profile picture"
+            style={({ pressed }) => [
+              styles.cameraBadge,
+              {
+                backgroundColor: colors.background,
+                borderColor: colors.border,
+                opacity: pressed ? 0.7 : 1,
+              },
+            ]}
+          >
+            <Feather name="camera" size={13} color={colors.foregroundMuted} />
+          </Pressable>
+        ) : null}
+      </View>
 
       {/* ── Name — stays centred without the old Edit pill ── */}
       <View style={styles.nameRow}>
@@ -204,6 +221,7 @@ export function ProfileHero({
 const styles = StyleSheet.create({
   root: { alignItems: 'center', paddingTop: 8 },
   avatarWrap: { marginBottom: 16 },
+  avatarPressed: { opacity: 0.85 },
   cameraBadge: {
     position: 'absolute',
     right: -2,

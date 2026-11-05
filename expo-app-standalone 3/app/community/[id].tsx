@@ -86,6 +86,7 @@ import { useChatImeLayout } from '@/hooks/useChatImeLayout';
 import { CommunityContentView } from '@/components/community/CommunityContentView';
 import { ContentDetailOverlay } from '@/components/community/ContentDetailOverlay';
 import { CommunityInfoView } from '@/components/community/CommunityInfoView';
+import { PhotoViewerModal } from '@/components/PhotoViewerModal';
 import { isContentKind, type CommunityTab, type ContentKind } from '@/lib/communityContent';
 import { canModerateContent } from '@/lib/communityPermissions';
 
@@ -176,6 +177,7 @@ export default function CommunityChat() {
   ), [listInset, listTransition]);
   /** The WhatsApp-style community info screen behind the header title. */
   const [infoOpen, setInfoOpen] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
   /**
    * Every open resolves the community from the signed-in member's list — not
    * just push deep-links, where the route can only carry the id. The header's
@@ -1424,33 +1426,46 @@ export default function CommunityChat() {
           <Feather name="arrow-left" size={22} color={colors.foreground} />
         </Pressable>
 
-        {/* Tapping the title area opens the community info screen, like
-            WhatsApp's contact info (web parity: the right sidebar there). */}
-        <Pressable
-          onPress={() => setInfoOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel={`${communityName} info`}
+        {/* The face opens the room's photo full screen; the title beside it
+            opens the community info screen, like WhatsApp's contact info
+            (web parity: the header's photo and the right sidebar there). */}
+        <View
           onLayout={(e) => setHeaderCenterWidth(e.nativeEvent.layout.width)}
           style={styles.headerCenter}
         >
-          {/* An event's group chat wears its date here too — and says LIVE
-              while the event is under way (web header parity). */}
-          <DpWithEventDate
-            date={resolved?.event_date}
-            endsAt={resolved?.event_end ?? resolved?.pinned_until}
-            dpSize={40}
+          <Pressable
+            onPress={() => setPhotoOpen(true)}
+            disabled={!communityImage}
+            accessibilityRole="button"
+            accessibilityLabel={communityImage ? `View ${communityName} photo` : undefined}
+            style={({ pressed }) =>
+              pressed && communityImage ? { opacity: 0.85 } : undefined
+            }
           >
-            {communityImage ? (
-              <Image
-                source={{ uri: communityImage }}
-                style={[styles.headerAvatar, { borderColor: colors.border }]}
-              />
-            ) : (
-              <CommunityIcon size={40} />
-            )}
-            {headerBadges.verified && <VerifiedDpBadge dpSize={40} />}
-          </DpWithEventDate>
-          <View style={styles.headerTitles}>
+            {/* An event's group chat wears its date here too — and says LIVE
+                while the event is under way (web header parity). */}
+            <DpWithEventDate
+              date={resolved?.event_date}
+              endsAt={resolved?.event_end ?? resolved?.pinned_until}
+              dpSize={40}
+            >
+              {communityImage ? (
+                <Image
+                  source={{ uri: communityImage }}
+                  style={[styles.headerAvatar, { borderColor: colors.border }]}
+                />
+              ) : (
+                <CommunityIcon size={40} />
+              )}
+              {headerBadges.verified && <VerifiedDpBadge dpSize={40} />}
+            </DpWithEventDate>
+          </Pressable>
+          <Pressable
+            onPress={() => setInfoOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`${communityName} info`}
+            style={styles.headerTitles}
+          >
             <View style={styles.headerTitleRow}>
               <Text style={[styles.headerTitle, { color: colors.foreground }]} numberOfLines={1}>
                 {communityName}
@@ -1515,8 +1530,8 @@ export default function CommunityChat() {
                 </View>
               )}
             </View>
-          </View>
-        </Pressable>
+          </Pressable>
+        </View>
 
         {/* Community options — anchored under this button, WhatsApp-style:
             notifications (the old header bell), Delete chat, Exit community. */}
@@ -1750,6 +1765,14 @@ export default function CommunityChat() {
         onReport={() => setReportCommunityOpen(true)}
         reported={communityReported}
         onClose={() => setInfoOpen(false)}
+      />
+
+      {/* The face in the header, full screen. */}
+      <PhotoViewerModal
+        visible={photoOpen}
+        uri={communityImage ?? null}
+        title="Community photo"
+        onClose={() => setPhotoOpen(false)}
       />
 
       {/* Edit composer */}
