@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   AppState,
+  BackHandler,
   FlatList,
   Pressable,
   RefreshControl,
@@ -21,10 +22,18 @@ import {
   NotificationPermissionBanner,
   NotificationPermissionSheet,
 } from '@/components/communities/NotificationPermissionPrompt';
+import { CommunityMuteSheet } from '@/components/community/CommunityMuteSheet';
 import { useColors } from '@/hooks/useColors';
 import { useCommunities } from '@/hooks/useCommunities';
 import { useNotificationPermission } from '@/hooks/useNotificationPermission';
-import { Community } from '@/lib/communities';
+import {
+  Community,
+  type CommunityMuteDuration,
+  setCommunityMute,
+} from '@/lib/communities';
+import { communityStore } from '@/lib/communityStore';
+import { isCommunityMuted } from '@/lib/communityMute';
+import { hapticImpact, hapticSelection } from '@/lib/haptics';
 import { useAuth } from '@/context/AuthContext';
 import { prefetchCommunityMessages } from '@/lib/communityMessageStoreRuntime';
 import {
@@ -39,6 +48,102 @@ import {
  * rule the web's useHiddenCatchUp applies to hidden tabs.
  */
 const FOCUS_CATCH_UP_MIN_AWAY_MS = 5_000;
+
+/** The list's one-at-a-time notice (mute confirmations and their Undo). */
+interface ListToast {
+  message: string;
+  actionLabel?: string;
+  onAction?: () => Promise<void> | void;
+}
+
+/**
+ * WhatsApp's selection toolbar. Holding a chat row replaces the workspace
+ * header with the selected count and the actions that apply to it; the only
+ * action here is mute, which reuses the chat header's ⋯ menu durations.
+ *
+ * A selection that includes an already-muted chat cannot be muted again, so
+ * the bell gives way to a hint asking for that chat to be deselected — the
+ * remaining chats can then be muted together.
+ */
+function ChatSelectionHeader({
+  count,
+  includesMuted,
+  busy,
+  onClose,
+  onMute,
+}: {
+  count: number;
+  includesMuted: boolean;
+  busy: boolean;
+  onClose: () => void;
+  onMute: () => void;
+}) {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  return (
+    <View
+      style={[
+        styles.header,
+        {
+          backgroundColor: colors.background,
+          borderBottomColor: colors.border,
+          paddingTop: insets.top + 8,
+        },
+      ]}
+    >
+      <View style={styles.headerLeft}>
+        <Pressable
+          onPress={onClose}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Exit selection"
+          style={({ pressed }) => [styles.headerIconBtn, { opacity: pressed ? 0.7 : 1 }]}
+        >
+          <Feather name="arrow-left" size={22} color={colors.foreground} />
+        </Pressable>
+        <Text
+          accessibilityLiveRegion="polite"
+          style={[styles.selectionCount, { color: colors.foreground }]}
+        >
+          {count}
+        </Text>
+      </View>
+      {includesMuted ? (
+        <Text
+          accessible
+          accessibilityLabel="Already muted — deselect it to mute the other chats"
+          numberOfLines={1}
+          style={[styles.selectionHint, { color: colors.mutedForeground }]}
+        >
+          Already muted — deselect it
+        </Text>
+      ) : (
+        <Pressable
+          onPress={onMute}
+          disabled={busy}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel="Mute notifications"
+          style={({ pressed }) => [
+            styles.headerIconBtn,
+            { opacity: busy ? 0.5 : pressed ? 0.7 : 1 },
+          ]}
+        >
+          {busy ? (
+            <ActivityIndicator size="small" color={colors.foreground} />
+          ) : (
+            <Feather
+              name="bell-off"
+              size={20}
+              strokeWidth={2.25}
+              color={colors.foreground}
+            />
+          )}
+        </Pressable>
+      )}
+    </View>
+  );
+}
 
 export default function CommunitiesScreen() {
   const { user } = useAuth();
@@ -62,6 +167,190 @@ export default function CommunitiesScreen() {
   const [notificationPromptOpen, setNotificationPromptOpen] = useState(false);
   const [notificationNoticeDismissed, setNotificationNoticeDismissed] = useState(false);
   const notificationPromptShownRef = useRef(false);
+
+  /** Rows claimed by selection; empty while the list is not selecting. */
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  /** The selection toolbar's mute row opens the duration sheet. */
+  const [muteSheetOpen, setMuteSheetOpen] = useState(false);
+  const [muteBusy, setMuteBusy] = useState(false);
+  /** The list's own toast — "Chat muted" with Undo, "Chat unmuted". */
+  const [toast, setToast] = useState<ListToast | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissToast = useCallback(() => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = null;
+    setToast(null);
+  }, []);
+  const showToast = useCallback((next: ListToast) => {
+    setToast(next);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => {
+      toastTimer.current = null;
+      setToast(null);
+    }, 4000);
+  }, []);
+  useEffect(
+    () => () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    },
+    [],
+  );
+
+  const selectionActive = selectedIds.size > 0;
+  const selectedCommunities = useMemo(
+    () => communities.filter((c) => selectedIds.has(c.id)),
+    [communities, selectedIds],
+  );
+  // A chat that is already muted cannot be muted again, so one in the
+  // selection retires the toolbar's bell in favour of a hint.
+  const selectionIncludesMuted = selectedCommunities.some((c) =>
+    isCommunityMuted(c, nowMs),
+  );
+
+  const exitSelection = useCallback(() => {
+    setSelectedIds(new Set());
+    setMuteSheetOpen(false);
+  }, []);
+
+  const handleSelect = useCallback((community: Community) => {
+    hapticSelection();
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(community.id)) next.delete(community.id);
+      else next.add(community.id);
+      return next;
+    });
+  }, []);
+
+  const handleLongPress = useCallback((community: Community) => {
+    hapticImpact();
+    setMuteSheetOpen(false);
+    setSelectedIds((current) => {
+      if (current.has(community.id)) return current;
+      return new Set(current).add(community.id);
+    });
+  }, []);
+
+  // Rows removed elsewhere (Exit community on another device, an archive)
+  // take their selection with them.
+  useEffect(() => {
+    if (selectedIds.size === 0) return;
+    const alive = new Set(communities.map((c) => c.id));
+    const next = new Set([...selectedIds].filter((id) => alive.has(id)));
+    if (next.size === selectedIds.size) return;
+    setSelectedIds(next);
+    if (next.size === 0) setMuteSheetOpen(false);
+  }, [communities, selectedIds]);
+
+  // Android's back button leaves selection before it leaves the tab.
+  useEffect(() => {
+    if (!selectionActive) return undefined;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      exitSelection();
+      return true;
+    });
+    return () => sub.remove();
+  }, [selectionActive, exitSelection]);
+
+  // Leaving the tab drops the selection, like WhatsApp's chat list.
+  useFocusEffect(
+    useCallback(
+      () => () => {
+        setSelectedIds(new Set());
+        setMuteSheetOpen(false);
+      },
+      [],
+    ),
+  );
+
+  /**
+   * Save the caller's mute for every selected chat and confirm with one
+   * toast — "Chat muted"/"3 chats muted" with Undo, and the same in the
+   * plural for unmute. Failures leave just the failed rows selected so a
+   * retry is one tap away; successful rows still patch through the shared
+   * store the moment each save lands.
+   */
+  const applyMute = useCallback(
+    async (
+      communityIds: string[],
+      duration: CommunityMuteDuration,
+      { reportFailure = true }: { reportFailure?: boolean } = {},
+    ): Promise<boolean> => {
+      if (muteBusy || communityIds.length === 0) return false;
+      setMuteBusy(true);
+      try {
+        const results = await Promise.allSettled(
+          communityIds.map((communityId) => setCommunityMute(communityId, duration)),
+        );
+        const succeeded: string[] = [];
+        const failed: string[] = [];
+        results.forEach((result, index) => {
+          const communityId = communityIds[index];
+          if (result.status === 'fulfilled') {
+            communityStore.notifyCommunityChanged({
+              kind: 'patch',
+              communityId,
+              patch: result.value,
+            });
+            succeeded.push(communityId);
+          } else {
+            failed.push(communityId);
+          }
+        });
+
+        if (failed.length > 0) {
+          setMuteSheetOpen(false);
+          if (reportFailure) {
+            setSelectedIds(new Set(failed));
+            showToast({ message: "Couldn't update notifications. Try again." });
+          }
+          return false;
+        }
+
+        const count = succeeded.length;
+        if (duration === 'off') {
+          showToast({ message: count === 1 ? 'Chat unmuted' : `${count} chats unmuted` });
+        } else {
+          showToast({
+            message: count === 1 ? 'Chat muted' : `${count} chats muted`,
+            actionLabel: 'Undo',
+            onAction: async () => {
+              if (!(await applyMute(succeeded, 'off', { reportFailure: false }))) {
+                throw new Error('undo failed');
+              }
+            },
+          });
+        }
+        setMuteSheetOpen(false);
+        setSelectedIds(new Set());
+        return true;
+      } catch {
+        if (reportFailure) {
+          showToast({ message: "Couldn't update notifications. Try again." });
+        }
+        return false;
+      } finally {
+        setMuteBusy(false);
+      }
+    },
+    // The undo closure references applyMute itself, exactly like the chat
+    // screen's handler.
+    [muteBusy, showToast],
+  );
+
+  const handleSelectionMute = useCallback(() => {
+    if (muteBusy || selectedCommunities.length === 0) return;
+    setMuteSheetOpen(true);
+  }, [muteBusy, selectedCommunities.length]);
+
+  const handleToastAction = useCallback(() => {
+    const action = toast?.onAction;
+    if (!action) return;
+    dismissToast();
+    Promise.resolve(action()).catch(() => {
+      showToast({ message: "Couldn't undo that" });
+    });
+  }, [toast, dismissToast, showToast]);
 
   // Opening the app with notifications off should explain why, not wait for
   // the banner link. Once per session; after that the banner carries it. If the
@@ -174,15 +463,38 @@ export default function CommunitiesScreen() {
         onPress={() => handleCommunityPress(item)}
         onPressIn={() => prefetchCommunityMessages(user?.id, item.id)}
         onPressAvatar={() => setPhotoCommunity(item)}
+        selectionMode={selectionActive}
+        selected={selectedIds.has(item.id)}
+        onLongPress={() => handleLongPress(item)}
+        onSelect={() => handleSelect(item)}
       />
     ),
-    [getTypingLabel, handleCommunityPress, nowMs, user?.id]
+    [
+      getTypingLabel,
+      handleCommunityPress,
+      handleLongPress,
+      handleSelect,
+      nowMs,
+      selectedIds,
+      selectionActive,
+      user?.id,
+    ],
   );
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar style={colors.isDark ? 'light' : 'dark'} />
-      <AppHeader />
+      {selectionActive ? (
+        <ChatSelectionHeader
+          count={selectedCommunities.length}
+          includesMuted={selectionIncludesMuted}
+          busy={muteBusy}
+          onClose={exitSelection}
+          onMute={handleSelectionMute}
+        />
+      ) : (
+        <AppHeader />
+      )}
 
       {/* Search filters the joined list locally. Creating lives in the
           floating + at the bottom-right, above the tab bar. */}
@@ -298,9 +610,49 @@ export default function CommunitiesScreen() {
         <Feather name="plus" size={22} color={colors.accentForeground} />
       </Pressable>
 
+      {toast && (
+        <View
+          style={[styles.toast, { backgroundColor: colors.foreground, top: insets.top + 112 }]}
+        >
+          <Text style={[styles.toastText, { color: colors.background }]}>{toast.message}</Text>
+          {toast.actionLabel && (
+            <Pressable
+              onPress={handleToastAction}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={toast.actionLabel}
+            >
+              <Text style={[styles.toastAction, { color: colors.background }]}>
+                {toast.actionLabel}
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+
       <NotificationPermissionSheet
         visible={notificationPromptOpen}
         onClose={() => setNotificationPromptOpen(false)}
+      />
+
+      {/* Mute durations for the selected rows — the chat header's ⋯ menu
+          sheet, opened from the selection toolbar. */}
+      <CommunityMuteSheet
+        open={muteSheetOpen}
+        muted={false}
+        muteStateLabel={null}
+        busy={muteBusy}
+        onChoose={(duration) => {
+          if (selectedCommunities.length > 0) {
+            void applyMute(
+              selectedCommunities.map((community) => community.id),
+              duration,
+            );
+          }
+        }}
+        onClose={() => {
+          if (!muteBusy) setMuteSheetOpen(false);
+        }}
       />
 
       <PhotoViewerModal
@@ -315,6 +667,40 @@ export default function CommunitiesScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+
+  // The selection toolbar mirrors AppHeader's height so the swap reads as one
+  // header changing, not the page jumping.
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 20,
+  },
+  headerIconBtn: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectionCount: {
+    fontSize: 18,
+    fontFamily: 'Geist_600SemiBold',
+  },
+  selectionHint: {
+    flexShrink: 1,
+    maxWidth: '60%',
+    fontSize: 12,
+    fontFamily: 'Geist_500Medium',
+    textAlign: 'right',
+  },
+
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -352,6 +738,26 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.16,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
+  },
+  // Same toast as the chat screen's mute confirmation, parked under the
+  // search row so it never covers the field it just left.
+  toast: {
+    position: 'absolute',
+    alignSelf: 'center',
+    zIndex: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  toastText: { fontSize: 12, fontFamily: 'Geist_500Medium' },
+  toastAction: {
+    fontSize: 12,
+    fontFamily: 'Geist_700Bold',
+    textDecorationLine: 'underline',
+    marginLeft: 2,
   },
   noResults: {
     alignItems: 'center',

@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { isCommunityMuted } from './communityMute';
+import { communityMuteLabel, isCommunityMuted } from './communityMute';
 
 const NOW = Date.parse('2026-10-11T12:00:00Z');
 
@@ -49,4 +49,35 @@ test('missing state, missing deadline and the false flag all read as unmuted', (
 
 test('an unparseable deadline never mutes (fail open, notifications continue)', () => {
   assert.equal(isCommunityMuted({ notifications_muted_until: 'not-a-date' }, NOW), false);
+});
+
+test('the sheet label says "Muted" for the forever flag and names a timed deadline', () => {
+  assert.equal(communityMuteLabel({ notifications_muted: true }, NOW), 'Muted');
+  assert.equal(
+    communityMuteLabel(
+      { notifications_muted: true, notifications_muted_until: '2026-10-11T20:00:00Z' },
+      NOW,
+    ),
+    'Muted',
+  );
+
+  const timed = communityMuteLabel(
+    { notifications_muted_until: '2026-10-11T20:00:00Z' },
+    NOW,
+  );
+  assert.ok(timed?.startsWith('Muted until '), `unexpected label: ${timed}`);
+});
+
+test('the sheet label is null whenever the membership reads as unmuted', () => {
+  assert.equal(communityMuteLabel(null, NOW), null);
+  assert.equal(communityMuteLabel({}, NOW), null);
+  assert.equal(communityMuteLabel({ notifications_muted: false }, NOW), null);
+  assert.equal(
+    communityMuteLabel({ notifications_muted_until: '2026-10-11T11:59:59Z' }, NOW),
+    null,
+  );
+  assert.equal(
+    communityMuteLabel({ notifications_muted_until: 'not-a-date' }, NOW),
+    null,
+  );
 });

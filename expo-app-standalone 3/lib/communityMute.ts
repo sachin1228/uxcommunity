@@ -36,3 +36,24 @@ export function isCommunityMuted(
   const deadline = Date.parse(until);
   return Number.isFinite(deadline) && deadline > now;
 }
+
+/**
+ * The mute sheet's second line — "Muted" for the forever flag, "Muted until
+ * …" for a timed one, null while unmuted. Shared by the chat header's ⋯
+ * menu and the chat list's selection toolbar so both surfaces read alike
+ * (web parity: the dropdown's label).
+ */
+export function communityMuteLabel(
+  state: CommunityMuteState | null | undefined,
+  now: number = Date.now(),
+): string | null {
+  if (!isCommunityMuted(state, now)) return null;
+  if (state?.notifications_muted) return 'Muted';
+  const until = state?.notifications_muted_until;
+  if (!until) return null;
+  const deadline = new Date(until);
+  if (!Number.isFinite(deadline.getTime())) return null;
+  const date = deadline.toLocaleDateString();
+  const time = deadline.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return `Muted until ${date} at ${time}`;
+}

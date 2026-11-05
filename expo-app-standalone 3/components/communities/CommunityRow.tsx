@@ -1,5 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Animated,
+  Easing,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { useColors } from '@/hooks/useColors';
@@ -38,6 +46,14 @@ interface Props {
   onPressIn?: () => void;
   /** Opens the community photo; the rest of the row still opens the chat. */
   onPressAvatar?: () => void;
+  /** The list holds a selection — a tap selects this row instead of opening it. */
+  selectionMode?: boolean;
+  /** This row is the selected one. */
+  selected?: boolean;
+  /** A 350ms hold enters the list's selection mode on this row. */
+  onLongPress?: () => void;
+  /** Claims or releases the selection while selectionMode is on. */
+  onSelect?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -163,6 +179,10 @@ export function CommunityRow({
   onPress,
   onPressIn,
   onPressAvatar,
+  selectionMode = false,
+  selected = false,
+  onLongPress,
+  onSelect,
 }: Props) {
   const colors = useColors();
   // Two press targets share one pressed tint, so the row still reads as a
@@ -198,13 +218,32 @@ export function CommunityRow({
   const isMuted = isCommunityMuted(community, nowMs);
   const badges = communityNameBadges(community.type, community.is_private);
 
+  // The selection check takes the verified seal's corner. It springs in so the
+  // swap reads as a state change rather than a flicker; the seal returns when
+  // the row leaves selection.
+  const selectionAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!selected) {
+      selectionAnim.setValue(0);
+      return undefined;
+    }
+    const animation = Animated.timing(selectionAnim, {
+      toValue: 1,
+      duration: 160,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [selected, selectionAnim]);
+
   // An event's group chat wears its event date as a calendar tile over the
   // same face everywhere (web parity), and a platform group's verified seal
   // rides the face itself.
   const avatar = (
     <DpWithEventDate
-      date={community.event_date}
-      endsAt={community.event_end ?? community.pinned_until}
+      date={selected ? null : community.event_date}
+      endsAt={selected ? null : community.event_end ?? community.pinned_until}
       dpSize={48}
     >
       {community.image_url ? (
@@ -218,7 +257,7 @@ export function CommunityRow({
       ) : (
         <CommunityIcon size={48} />
       )}
-      {badges.verified && <VerifiedDpBadge dpSize={48} />}
+      {badges.verified && !selected && <VerifiedDpBadge dpSize={48} />}
     </DpWithEventDate>
   );
 
@@ -229,35 +268,90 @@ export function CommunityRow({
       // Transparent by default so the page background shows through the list,
       // exactly like the web sidebar rows; pressing either target lifts the
       // whole row onto the raised surface (the web's hover/active treatment).
+      // A selected row keeps the soft accent tint while the list is selecting.
       style={[
         styles.row,
-        { backgroundColor: rowPressed ? colors.surfaceRaised : 'transparent' },
+        {
+          backgroundColor: selected
+            ? colors.accentSoft
+            : rowPressed
+              ? colors.surfaceRaised
+              : 'transparent',
+        },
       ]}
     >
       {/* Avatar — start aligned. With a picture it opens the photo full screen
           instead of the chat; without one it keeps opening the chat, exactly
           as the whole row always did. Pressing the face does not tint the
-          row: the tint is the row's own press feedback. */}
+          row: the tint is the row's own press feedback. In selection mode the
+          face selects the row like every other part of it. */}
       <Pressable
-        onPress={canViewPhoto ? onPressAvatar : onPress}
-        onPressIn={onPressIn}
+        onPress={selectionMode ? onSelect : canViewPhoto ? onPressAvatar : onPress}
+        onPressIn={selectionMode ? undefined : onPressIn}
+        onLongPress={onLongPress}
+        delayLongPress={350}
         hitSlop={canViewPhoto ? 6 : undefined}
-        accessible={canViewPhoto}
-        accessibilityRole={canViewPhoto ? 'button' : undefined}
-        accessibilityLabel={canViewPhoto ? `View ${community.name} photo` : undefined}
+        accessible={selectionMode || canViewPhoto}
+        accessibilityRole={selectionMode || canViewPhoto ? 'button' : undefined}
+        accessibilityLabel={
+          selectionMode
+            ? `Select ${community.name}`
+            : canViewPhoto
+              ? `View ${community.name} photo`
+              : undefined
+        }
+        accessibilityState={selectionMode ? { selected } : undefined}
         style={({ pressed }) => [styles.avatarWrap, pressed ? styles.avatarPressed : null]}
       >
         {avatar}
+        {selected && (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.selectedBadge,
+              {
+                backgroundColor: colors.accent,
+                borderColor: colors.background,
+                opacity: selectionAnim,
+                transform: [
+                  {
+                    scale: selectionAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.7, 1],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <Feather
+              name="check"
+              size={12}
+              strokeWidth={3}
+              color={colors.accentForeground}
+            />
+          </Animated.View>
+        )}
       </Pressable>
 
       {/* Body */}
       <Pressable
-        onPress={onPress}
-        onPressIn={() => {
-          setRowPressed(true);
-          onPressIn?.();
-        }}
+        onPress={selectionMode ? onSelect : onPress}
+        onPressIn={
+          selectionMode
+            ? undefined
+            : () => {
+                setRowPressed(true);
+                onPressIn?.();
+              }
+        }
+        // Always clear the local tint: the long press flips this row into
+        // selection mode mid-gesture, and a mode-dependent handler would
+        // vanish before the release that is supposed to clear it.
         onPressOut={() => setRowPressed(false)}
+        onLongPress={onLongPress}
+        delayLongPress={350}
+        accessibilityState={selectionMode ? { selected } : undefined}
         style={styles.body}
       >
         {/* Name + badges + time — the name line carries the globe/lock
@@ -378,6 +472,19 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   avatarPressed: { opacity: 0.85 },
+  // The selection check sits exactly where the verified seal sits, so
+  // selecting swaps the blue tick for the check and deselecting swaps it back.
+  selectedBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   avatarBase: {
     alignItems: 'center',
     justifyContent: 'center',
