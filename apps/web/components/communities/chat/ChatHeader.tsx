@@ -8,6 +8,7 @@ import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
+import { PhotoViewer } from "@/components/ui/PhotoViewer";
 import { CommunityDp } from "../CommunityDp";
 import { DpWithEventDate } from "../DpWithEventDate";
 import { CommunityNameBadges } from "../CommunityBadges";
@@ -182,6 +183,7 @@ export const ChatHeader = memo(function ChatHeader({
   // offer an action that can only fail.
   const [reportOpen, setReportOpen] = useState(false);
   const [reported, setReported] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Timed mutes lapse on their own without the row being rewritten, so the
@@ -325,6 +327,24 @@ export const ChatHeader = memo(function ChatHeader({
       )
     : DEFAULT_TABS;
 
+  // The face in the header — the way into the room's photo (see PhotoViewer).
+  const dpWithEventBadge = community ? (
+    <DpWithEventDate
+      date={community.event_date}
+      endsAt={community.event_end ?? community.pinned_until}
+      dpSize={44}
+    >
+      <CommunityDp
+        imageUrl={community.image_url}
+        name={community.name}
+        size={44}
+        iconSize={18}
+        className="bg-surface-raised"
+        verified={communityNameBadges(community.type, community.is_private).verified}
+      />
+    </DpWithEventDate>
+  ) : null;
+
   return (
     <>
       {confirmAction && (
@@ -346,6 +366,16 @@ export const ChatHeader = memo(function ChatHeader({
         />
       )}
 
+      {community ? (
+        <PhotoViewer
+          open={photoOpen}
+          src={community.image_url}
+          name={community.name}
+          subtitle="Community photo"
+          onClose={() => setPhotoOpen(false)}
+        />
+      ) : null}
+
       <div className="px-5 pt-4 border-b border-border shrink-0">
         {community ? (
           <>
@@ -354,20 +384,19 @@ export const ChatHeader = memo(function ChatHeader({
                 {/* The event's group chat wears its date here too: the room's
                     name is the event's name, so the day belongs beside it —
                     and says LIVE while the event is under way. */}
-                <DpWithEventDate
-                  date={community.event_date}
-                  endsAt={community.event_end ?? community.pinned_until}
-                  dpSize={44}
-                >
-                  <CommunityDp
-                    imageUrl={community.image_url}
-                    name={community.name}
-                    size={44}
-                    iconSize={18}
-                    className="bg-surface-raised"
-                    verified={communityNameBadges(community.type, community.is_private).verified}
-                  />
-                </DpWithEventDate>
+                {community.image_url ? (
+                  <button
+                    type="button"
+                    onClick={() => setPhotoOpen(true)}
+                    aria-label={`View ${community.name} photo`}
+                    title="View photo"
+                    className="shrink-0 rounded-full transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  >
+                    {dpWithEventBadge}
+                  </button>
+                ) : (
+                  dpWithEventBadge
+                )}
                 <div>
                   <h3 className="font-display text-base font-semibold text-foreground leading-none">
                     <span className="inline-flex items-center gap-1.5">

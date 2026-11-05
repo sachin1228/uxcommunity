@@ -2,7 +2,8 @@
 
 import { memo, useState } from "react";
 import { ChevronLeft, Search } from "lucide-react";
-import { AvatarImg } from "@/components/ui/AvatarImg";
+import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
+import { PhotoViewer } from "@/components/ui/PhotoViewer";
 import { DmIcon } from "@/components/ui/DmIcon";
 import { Spinner } from "@/components/ui/Spinner";
 import { SidebarTimestamp } from "@/components/communities/panel/SidebarTimestamp";
@@ -48,6 +49,11 @@ export const DmListPane = memo(function DmListPane({
   className?: string;
 }) {
   const [query, setQuery] = useState("");
+  /** The peer whose face is open full screen. */
+  const [photoPeer, setPhotoPeer] = useState<{
+    name: string;
+    avatarUrl: string | null;
+  } | null>(null);
   // Rows this viewer should not see: a rejected request is closed for both
   // sides, and the viewer's blocked peers drop out of their pane. The server
   // list already omits both — this also covers locally patched state before
@@ -143,15 +149,15 @@ export const DmListPane = memo(function DmListPane({
               // px-3/sm:px-4 — the brand's own inset (the topbar logo starts at
               // pl-3, then pl-4 from sm), so avatars, search field and chevron
               // share one left edge.
-              <button
-                key={conversation.id}
-                type="button"
-                onClick={() => onSelect(conversation.id)}
-                className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors sm:px-4 ${
-                  active ? "bg-surface-raised" : "hover:bg-surface-raised/60"
-                }`}
-                aria-current={active ? "true" : undefined}
-              >
+              <div key={conversation.id} className="relative">
+                <button
+                  type="button"
+                  onClick={() => onSelect(conversation.id)}
+                  className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors sm:px-4 ${
+                    active ? "bg-surface-raised" : "hover:bg-surface-raised/60"
+                  }`}
+                  aria-current={active ? "true" : undefined}
+                >
                 <AvatarImg
                   url={conversation.peer.avatar_url}
                   name={conversation.peer.name}
@@ -225,11 +231,40 @@ export const DmListPane = memo(function DmListPane({
                     )}
                   </span>
                 </span>
-              </button>
+                </button>
+                {/* A hit area exactly over the face — the row button keeps
+                    the whole-row target; this opens the photo instead, even
+                    when it is the initials placeholder. The row does not
+                    light up for this press: only the face is the target. */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPhotoPeer({
+                      name: conversation.peer.name,
+                      avatarUrl: conversation.peer.avatar_url,
+                    })
+                  }
+                  className="absolute left-3 top-1/2 h-10 w-10 -translate-y-1/2 rounded-full transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:left-4"
+                  aria-label={`View ${conversation.peer.name}'s profile picture`}
+                  title="View photo"
+                />
+              </div>
             );
           })
         )}
       </div>
+
+      <PhotoViewer
+        open={photoPeer !== null}
+        src={
+          photoPeer?.avatarUrl && !isGeneratedProfilePicture(photoPeer.avatarUrl)
+            ? photoPeer.avatarUrl
+            : null
+        }
+        name={photoPeer?.name ?? ""}
+        subtitle="Profile picture"
+        onClose={() => setPhotoPeer(null)}
+      />
     </aside>
   );
 });

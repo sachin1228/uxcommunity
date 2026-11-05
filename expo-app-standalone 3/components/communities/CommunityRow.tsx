@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
@@ -36,6 +36,8 @@ interface Props {
   nowMs: number;
   onPress: () => void;
   onPressIn?: () => void;
+  /** Opens the community photo; the rest of the row still opens the chat. */
+  onPressAvatar?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -154,8 +156,18 @@ function previewText(
 // CommunityRow
 // ---------------------------------------------------------------------------
 
-export function CommunityRow({ community, typingLabel, nowMs, onPress, onPressIn }: Props) {
+export function CommunityRow({
+  community,
+  typingLabel,
+  nowMs,
+  onPress,
+  onPressIn,
+  onPressAvatar,
+}: Props) {
   const colors = useColors();
+  // Two press targets share one pressed tint, so the row still reads as a
+  // single surface: the face (photo) and everything beside it (the chat).
+  const [rowPressed, setRowPressed] = useState(false);
 
   // A content item newer than the newest message takes over the preview line
   // ("John: created a thread"); older ones leave the message preview alone.
@@ -186,44 +198,68 @@ export function CommunityRow({ community, typingLabel, nowMs, onPress, onPressIn
   const isMuted = isCommunityMuted(community, nowMs);
   const badges = communityNameBadges(community.type, community.is_private);
 
-  return (
-    <Pressable
-      // Transparent by default so the page background shows through the list,
-      // exactly like the web sidebar rows; pressing lifts the row onto the
-      // raised surface (the web's hover/active treatment).
-      style={({ pressed }) => [
-        styles.row,
-        { backgroundColor: pressed ? colors.surfaceRaised : 'transparent' },
-      ]}
-      onPress={onPress}
-      onPressIn={onPressIn}
+  // An event's group chat wears its event date as a calendar tile over the
+  // same face everywhere (web parity), and a platform group's verified seal
+  // rides the face itself.
+  const avatar = (
+    <DpWithEventDate
+      date={community.event_date}
+      endsAt={community.event_end ?? community.pinned_until}
+      dpSize={48}
     >
-      {/* Avatar — start aligned. An event's group chat wears its event date
-          as a calendar tile over the same face everywhere (web parity), and a
-          platform group's verified seal rides the face itself. */}
-      <View style={styles.avatarWrap}>
-        <DpWithEventDate
-          date={community.event_date}
-          endsAt={community.event_end ?? community.pinned_until}
-          dpSize={48}
-        >
-          {community.image_url ? (
-            <Image
-              source={{ uri: community.image_url }}
-              style={[
-                styles.avatarBase,
-                { width: 48, height: 48, borderRadius: 24, borderColor: colors.border },
-              ]}
-            />
-          ) : (
-            <CommunityIcon size={48} />
-          )}
-          {badges.verified && <VerifiedDpBadge dpSize={48} />}
-        </DpWithEventDate>
-      </View>
+      {community.image_url ? (
+        <Image
+          source={{ uri: community.image_url }}
+          style={[
+            styles.avatarBase,
+            { width: 48, height: 48, borderRadius: 24, borderColor: colors.border },
+          ]}
+        />
+      ) : (
+        <CommunityIcon size={48} />
+      )}
+      {badges.verified && <VerifiedDpBadge dpSize={48} />}
+    </DpWithEventDate>
+  );
+
+  const canViewPhoto = Boolean(onPressAvatar && community.image_url);
+
+  return (
+    <View
+      // Transparent by default so the page background shows through the list,
+      // exactly like the web sidebar rows; pressing either target lifts the
+      // whole row onto the raised surface (the web's hover/active treatment).
+      style={[
+        styles.row,
+        { backgroundColor: rowPressed ? colors.surfaceRaised : 'transparent' },
+      ]}
+    >
+      {/* Avatar — start aligned. With a picture it opens the photo full screen
+          instead of the chat; without one it keeps opening the chat, exactly
+          as the whole row always did. Pressing the face does not tint the
+          row: the tint is the row's own press feedback. */}
+      <Pressable
+        onPress={canViewPhoto ? onPressAvatar : onPress}
+        onPressIn={onPressIn}
+        hitSlop={canViewPhoto ? 6 : undefined}
+        accessible={canViewPhoto}
+        accessibilityRole={canViewPhoto ? 'button' : undefined}
+        accessibilityLabel={canViewPhoto ? `View ${community.name} photo` : undefined}
+        style={({ pressed }) => [styles.avatarWrap, pressed ? styles.avatarPressed : null]}
+      >
+        {avatar}
+      </Pressable>
 
       {/* Body */}
-      <View style={styles.body}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={() => {
+          setRowPressed(true);
+          onPressIn?.();
+        }}
+        onPressOut={() => setRowPressed(false)}
+        style={styles.body}
+      >
         {/* Name + badges + time — the name line carries the globe/lock
             ("Electro 🔒", "Electro 🌐"), like the web sidebar; the verified
             seal rides the DP. */}
@@ -321,8 +357,8 @@ export function CommunityRow({ community, typingLabel, nowMs, onPress, onPressIn
             </View>
           )}
         </View>
-      </View>
-    </Pressable>
+      </Pressable>
+    </View>
   );
 }
 
@@ -341,6 +377,7 @@ const styles = StyleSheet.create({
   avatarWrap: {
     marginTop: 2,
   },
+  avatarPressed: { opacity: 0.85 },
   avatarBase: {
     alignItems: 'center',
     justifyContent: 'center',

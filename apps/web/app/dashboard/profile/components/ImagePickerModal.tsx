@@ -34,8 +34,10 @@ export function ImagePickerModal({
 
   return (
     <ModalPortal>
+      {/* Above the full-screen photo viewer (z-[1200]): the picture stays
+          visible behind this step, and updates in place once saved. */}
       <div
-        className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+        className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
         onClick={(event) => {
           if (event.target === event.currentTarget) onClose();
         }}

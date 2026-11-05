@@ -34,6 +34,7 @@ import { ContentReportModal } from '@/components/community/ContentReportModal';
 import { DOT_BAND_HEIGHT, DotField } from '@/components/profile/DotField';
 import { ProfileHeaderButton, ProfilePageHeader } from '@/components/profile/ProfilePageHeader';
 import { MemberProfileHero } from '@/components/profile/MemberProfileHero';
+import { PhotoViewerModal } from '@/components/PhotoViewerModal';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import { useViewableKeys } from '@/hooks/useViewableKeys';
@@ -60,6 +61,7 @@ import {
   type MemberFeedScope,
 } from '@/lib/profileFeed';
 import { getMemberProfile, type MemberProfile } from '@/lib/profile';
+import { resolveProfilePictureUri } from '@/lib/profilePicture';
 import {
   fetchScreenData,
   invalidateScreenData,
@@ -163,6 +165,7 @@ function MemberProfileSession({
   const [messageError, setMessageError] = useState<string | null>(null);
   const [unblocking, setUnblocking] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
   /** Guards a second push while the first tap's transition is starting. */
   const navigatingToMessagesRef = useRef(false);
 
@@ -471,6 +474,9 @@ function MemberProfileSession({
 
   const body = member?.profile;
   const identityName = member?.user?.name ?? 'Member';
+  // Only a real stored picture skips the initials; either way the face opens
+  // the viewer, with the initials drawn at full size when there is none.
+  const memberPhoto = resolveProfilePictureUri(body?.avatar_url);
 
   const header = (
     <View style={styles.heroWrap}>
@@ -488,6 +494,7 @@ function MemberProfileSession({
         linkedinUrl={body?.linkedin_url ?? ''}
         portfolioUrl={body?.portfolio_url ?? ''}
         blockedByMe={member?.blockedByMe ?? false}
+        onPressAvatar={() => setPhotoOpen(true)}
         onMessage={() => void openMessage()}
         onUnblock={() => void handleUnblock()}
         onReport={() => setReportOpen(true)}
@@ -639,6 +646,14 @@ function MemberProfileSession({
         communityName={selected?.community_name ?? null}
         visible={Boolean(selected)}
         onClose={() => setSelected(null)}
+      />
+
+      <PhotoViewerModal
+        visible={photoOpen}
+        uri={memberPhoto}
+        name={identityName}
+        title="Profile picture"
+        onClose={() => setPhotoOpen(false)}
       />
     </View>
   );

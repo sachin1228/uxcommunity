@@ -25,6 +25,8 @@ interface Props {
   linkedinUrl: string;
   portfolioUrl: string;
   blockedByMe: boolean;
+  /** Opens the member's photo full screen; omitted when they have none. */
+  onPressAvatar?: () => void;
   onMessage: () => void;
   onUnblock: () => void;
   onReport: () => void;
@@ -55,6 +57,7 @@ export function MemberProfileHero({
   linkedinUrl,
   portfolioUrl,
   blockedByMe,
+  onPressAvatar,
   onMessage,
   onUnblock,
   onReport,
@@ -67,12 +70,28 @@ export function MemberProfileHero({
 
   return (
     <View style={styles.root}>
-      <PersonAvatar
-        name={name}
-        url={avatarUrl}
-        size={96}
-        style={{ borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}
-      />
+      {onPressAvatar ? (
+        <Pressable
+          onPress={onPressAvatar}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${name}'s profile picture`}
+          style={({ pressed }) => (pressed ? styles.avatarPressed : null)}
+        >
+          <PersonAvatar
+            name={name}
+            url={avatarUrl}
+            size={96}
+            style={{ borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}
+          />
+        </Pressable>
+      ) : (
+        <PersonAvatar
+          name={name}
+          url={avatarUrl}
+          size={96}
+          style={{ borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}
+        />
+      )}
 
       <Text style={[styles.name, { color: colors.foreground }]} numberOfLines={1}>
         {name}
@@ -227,6 +246,7 @@ export function MemberProfileHero({
 
 const styles = StyleSheet.create({
   root: { alignItems: 'center', paddingTop: 8 },
+  avatarPressed: { opacity: 0.85 },
   name: {
     fontSize: 23,
     fontFamily: 'Geist_700Bold',

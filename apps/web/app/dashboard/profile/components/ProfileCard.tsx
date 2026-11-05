@@ -3,12 +3,13 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Ban, Camera, Flag, Globe, Linkedin, MapPin, MoreVertical, Plus, ShieldOff } from "lucide-react";
+import { Ban, Flag, Globe, Linkedin, MapPin, MoreVertical, Plus, ShieldOff } from "lucide-react";
 import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
 import { DmIcon } from "@/components/ui/DmIcon";
 import { CompanyLogo, VerifiedMark } from "@/components/companies/CompanyBadge";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import { PendingButton } from "@/components/ui/PendingButton";
+import { PhotoViewer } from "@/components/ui/PhotoViewer";
 import { ReportModal } from "@/components/communities/ReportModal";
 import type { ProfileCompanyView } from "@/components/companies/types";
 import { dmUrls } from "@/lib/direct-messages/client";
@@ -141,6 +142,7 @@ export function ProfileCard({
   const [blockError, setBlockError] = useState<string | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [reported, setReported] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
   const blockedByMe = blockControls?.blockedByMe ?? false;
   // While the viewer has this member blocked the profile reduces to the
   // identity the blocked line needs — picture, name, role, city — so the
@@ -190,9 +192,15 @@ export function ProfileCard({
             (`AvatarImg`), rather than a flat placeholder of its own — a member
             with no display picture should read the same here as in the
             topbar. */}
-        <div className="group relative mx-auto h-24 w-24 shrink-0">
+        <div className="relative mx-auto h-24 w-24 shrink-0">
           {hasPicture ? (
-            <div className="h-24 w-24 overflow-hidden rounded-full border border-border bg-accent/20 shadow-lg">
+            <button
+              type="button"
+              onClick={() => setPhotoOpen(true)}
+              aria-label={`View ${name}'s profile picture`}
+              title="View photo"
+              className="block h-24 w-24 overflow-hidden rounded-full border border-border bg-accent/20 shadow-lg transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
               <AvatarImg
                 url={avatarUrl}
                 name={name}
@@ -200,19 +208,16 @@ export function ProfileCard({
                 rounded={false}
                 className="h-full w-full object-cover"
               />
-            </div>
+            </button>
           ) : (
-            <AvatarImg url={avatarUrl} name={name} size={96} className="h-24 w-24 shadow-lg" />
-          )}
-          {onOpenAvatarPicker && (
             <button
               type="button"
-              onClick={onOpenAvatarPicker}
-              aria-label="Change profile picture"
-              title="Change profile picture"
-              className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none"
+              onClick={() => setPhotoOpen(true)}
+              aria-label={`View ${name}'s profile picture`}
+              title="View photo"
+              className="block rounded-full transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
-              <Camera strokeWidth={2.5} size={20} />
+              <AvatarImg url={avatarUrl} name={name} size={96} className="h-24 w-24 shadow-lg" />
             </button>
           )}
         </div>
@@ -499,6 +504,19 @@ export function ProfileCard({
             {blockError}
           </p>
         )}
+
+        <PhotoViewer
+          open={photoOpen}
+          src={hasPicture ? avatarUrl : null}
+          name={name}
+          subtitle="Profile picture"
+          onEdit={
+            onOpenAvatarPicker
+              ? () => onOpenAvatarPicker()
+              : undefined
+          }
+          onClose={() => setPhotoOpen(false)}
+        />
 
       </div>
     </section>

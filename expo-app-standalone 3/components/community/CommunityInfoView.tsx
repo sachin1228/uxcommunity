@@ -22,6 +22,7 @@ import { loadCommunityDetail, peekCommunityDetail } from '@/lib/communityDetailC
 import { peekCommunityRules, putCommunityRules } from '@/lib/communityRulesCache';
 import { CommunityNameBadges, VerifiedDpBadge } from '@/components/communities/CommunityBadges';
 import { CommunityIcon } from '@/components/communities/CommunityIcon';
+import { PhotoViewerModal } from '@/components/PhotoViewerModal';
 import { MembersPanel } from '@/components/community/MembersPanel';
 import { ActivityPanel } from '@/components/community/ActivityPanel';
 import { communityNameBadges } from '@/lib/communityBadges';
@@ -124,6 +125,13 @@ export function CommunityInfoView({
   const [detail, setDetail] = useState<CommunityDetailRow | null>(null);
   const [rules, setRules] = useState<CommunityRule[] | null>(null);
   const [activeTab, setActiveTab] = useState<InfoTab>('about');
+  const [photoOpen, setPhotoOpen] = useState(false);
+
+  // A closing info screen must not leave its photo viewer latched open for
+  // the next opening.
+  useEffect(() => {
+    if (!visible) setPhotoOpen(false);
+  }, [visible]);
 
   // Each opening starts back on Overview; the detail cache paints instantly
   // when it is fresh, and the request refreshes it in the background.
@@ -205,6 +213,7 @@ export function CommunityInfoView({
         isPrivate={isPrivate}
         memberCount={memberCount}
         onlineCount={onlineCount}
+        onPressPhoto={() => setPhotoOpen(true)}
       />
       <View
         style={[
@@ -247,6 +256,7 @@ export function CommunityInfoView({
   );
 
   return (
+    <>
     <Modal visible animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <View style={[styles.root, { backgroundColor: colors.background }]}>
         <StatusBar style={colors.isDark ? 'light' : 'dark'} />
@@ -367,6 +377,13 @@ export function CommunityInfoView({
         )}
       </View>
     </Modal>
+    <PhotoViewerModal
+      visible={photoOpen}
+      uri={imageUrl}
+      title="Community photo"
+      onClose={() => setPhotoOpen(false)}
+    />
+    </>
   );
 }
 
@@ -377,6 +394,7 @@ function InfoHero({
   isPrivate,
   memberCount,
   onlineCount,
+  onPressPhoto,
 }: {
   name: string;
   imageUrl: string | null;
@@ -384,6 +402,7 @@ function InfoHero({
   isPrivate?: boolean;
   memberCount: number | null;
   onlineCount: number;
+  onPressPhoto: () => void;
 }) {
   const colors = useColors();
   // The name renders word by word so the badges can flow after the last word
@@ -404,14 +423,23 @@ function InfoHero({
 
   return (
     <View style={styles.hero}>
-      <View style={styles.heroAvatarWrap}>
+      <Pressable
+        onPress={onPressPhoto}
+        disabled={!imageUrl}
+        accessibilityRole="button"
+        accessibilityLabel={imageUrl ? `View ${name} photo` : undefined}
+        style={({ pressed }) => [
+          styles.heroAvatarWrap,
+          pressed && imageUrl ? styles.photoPressed : null,
+        ]}
+      >
         {imageUrl ? (
           <Image source={{ uri: imageUrl }} style={[styles.heroAvatar, { borderColor: colors.border }]} />
         ) : (
           <CommunityIcon size={96} />
         )}
         {heroBadges.verified && <VerifiedDpBadge dpSize={96} />}
-      </View>
+      </Pressable>
       <View style={styles.heroNameRow} accessible accessibilityLabel={heroLabel}>
         {nameWords.map((word, index) => (
           <Text key={`${word}-${index}`} style={[styles.heroName, { color: colors.foreground }]}>
@@ -458,6 +486,7 @@ const styles = StyleSheet.create({
   heroAvatarWrap: {
     position: 'relative',
   },
+  photoPressed: { opacity: 0.85 },
   heroAvatar: {
     width: 96,
     height: 96,
