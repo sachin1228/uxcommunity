@@ -58,6 +58,7 @@ export function directMessagePushPlan(
 }
 
 export interface DirectMessagePushInput {
+  recipientId: string;
   conversationId: string;
   messageId: string;
   senderId: string;
@@ -67,6 +68,47 @@ export interface DirectMessagePushInput {
   hasImage: boolean;
   isReply: boolean;
   audible: boolean;
+  /** The inserted row's own fields, carried for the instant-open snapshot. */
+  createdAt?: string | null;
+  imageUrl?: string | null;
+  replyToId?: string | null;
+  replySenderName?: string | null;
+  replySenderId?: string | null;
+}
+
+/** Leave headroom under the provider limit for the envelope. */
+const MAX_DM_SNAPSHOT_BYTES = 1_800;
+
+const byteLength = (value: unknown) =>
+  new TextEncoder().encode(JSON.stringify(value)).byteLength;
+
+/**
+ * The complete message row, mirrored after the community chat's push
+ * snapshot. A tapped notification paints this before any API round trip; the
+ * page fetch then reconciles it. Omitted for an oversized payload rather than
+ * risking the notification.
+ */
+export function directMessagePushSnapshot(
+  input: DirectMessagePushInput,
+): string | undefined {
+  if (!input.createdAt) return undefined;
+  const row = {
+    id: input.messageId,
+    conversation_id: input.conversationId,
+    user_id: input.senderId,
+    content: input.content,
+    image_url: input.imageUrl ?? null,
+    reply_to_id: input.replyToId ?? null,
+    created_at: input.createdAt,
+    sender_name: input.senderName,
+    sender_avatar_url: input.senderAvatarUrl,
+    reply_sender_name: input.replySenderName ?? null,
+    reply_sender_id: input.replySenderId ?? null,
+  };
+  const json = JSON.stringify(row);
+  return new TextEncoder().encode(json).byteLength <= MAX_DM_SNAPSHOT_BYTES
+    ? json
+    : undefined;
 }
 
 /** One Expo message per device. Pure so the payload is testable. */
@@ -80,6 +122,7 @@ export function directMessagePushMessages(
     hasImage: input.hasImage,
     isReply: input.isReply,
   });
+  const snapshot = directMessagePushSnapshot(input);
 
   return tokens.map((token) => ({
     to: token,
@@ -97,7 +140,9 @@ export function directMessagePushMessages(
       senderId: input.senderId,
       senderName: input.senderName ?? "Someone",
       senderAvatarUrl: input.senderAvatarUrl,
+      recipientId: input.recipientId,
       silent: !input.audible,
+      ...(snapshot ? { dmMessage: snapshot } : {}),
     },
   }));
 }
@@ -112,10 +157,16 @@ interface DirectMessagePushParams {
   content: string | null;
   hasImage: boolean;
   isReply: boolean;
+  createdAt?: string | null;
+  imageUrl?: string | null;
+  replyToId?: string | null;
+  replySenderName?: string | null;
+  replySenderId?: string | null;
 }
 
 /** The direct-FCM payload: enough for the native service to draw the DM. */
 export function directMessageFcmData(input: {
+  recipientId: string;
   conversationId: string;
   messageId: string;
   senderId: string;
@@ -126,8 +177,14 @@ export function directMessageFcmData(input: {
   isReply: boolean;
   audible: boolean;
   timestamp: number;
+  createdAt?: string | null;
+  imageUrl?: string | null;
+  replyToId?: string | null;
+  replySenderName?: string | null;
+  replySenderId?: string | null;
 }): Record<string, string> {
   const title = input.senderName?.trim() || "New message";
+  const snapshot = directMessagePushSnapshot(input);
   const data: Record<string, string> = {
     type: "dm_message",
     direct: "1",
@@ -135,6 +192,7 @@ export function directMessageFcmData(input: {
     messageId: input.messageId,
     senderId: input.senderId,
     senderName: input.senderName ?? "Someone",
+    recipientId: input.recipientId,
     message: messagePushPreview({
       content: input.content,
       hasImage: input.hasImage,
@@ -145,6 +203,7 @@ export function directMessageFcmData(input: {
     timestamp: String(input.timestamp),
     channelId: input.audible ? AUDIBLE_CHANNEL_ID : SILENT_CHANNEL_ID,
   };
+  if (snapshot) data.dmMessage = snapshot;
   if (input.senderAvatarUrl) {
     data.imageUrl = input.senderAvatarUrl;
     data.senderAvatarUrl = input.senderAvatarUrl;

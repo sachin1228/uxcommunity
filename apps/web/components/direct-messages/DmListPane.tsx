@@ -5,7 +5,7 @@ import { ChevronLeft, Search } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { DmIcon } from "@/components/ui/DmIcon";
 import { Spinner } from "@/components/ui/Spinner";
-import { fmtTimeAgo } from "@/components/communities/chat/chatUtils";
+import { SidebarTimestamp } from "@/components/communities/panel/SidebarTimestamp";
 import { NotoEmojiSvg } from "@/components/communities/chat/NotoEmojiSvg";
 import {
   ImagePreviewWord,
@@ -164,9 +164,7 @@ export const DmListPane = memo(function DmListPane({
                       {conversation.peer.name}
                     </span>
                     {!typingText && conversation.last_message_at && (
-                      <span className="shrink-0 font-body text-[11px] text-foreground-muted">
-                        {fmtTimeAgo(conversation.last_message_at)}
-                      </span>
+                      <SidebarTimestamp iso={conversation.last_message_at} />
                     )}
                   </span>
                   <span className="mt-0.5 flex items-center justify-between gap-2">

@@ -4,7 +4,7 @@ import test from 'node:test';
 import {
   createDmConversationsCache,
   DM_CONVERSATIONS_STALE_MS,
-} from './dmConversationsCache';
+} from './dmConversationsCacheCore';
 import type { DmConversation } from './dm';
 
 function conversation(id: string, name = id): DmConversation {
@@ -187,6 +187,27 @@ test('no active member sees or writes the shared page', async () => {
   assert.equal(cache.peekOneForPeer('peer-disk'), null);
   assert.deepEqual(await cache.load(), []);
   assert.equal(loads, 0);
+});
+
+test('a fresh read supersedes an in-flight stale page for every waiter', async () => {
+  const stale = deferred<DmConversation[]>();
+  const fresh = deferred<DmConversation[]>();
+  const loads: Array<Promise<DmConversation[]>> = [stale.promise, fresh.promise];
+  const cache = createDmConversationsCache({
+    load: () => loads.shift()!,
+  });
+  cache.setActiveUser('user-a');
+
+  const beforeRead = cache.load();
+  const afterRead = cache.load({ fresh: true });
+
+  stale.resolve([conversation('c1')]);
+  // The stale response must not paint; both callers wait for the fresh one.
+  fresh.resolve([{ ...conversation('c1'), unread_count: 0 }]);
+
+  assert.equal((await beforeRead)[0].unread_count, 0);
+  assert.equal((await afterRead)[0].unread_count, 0);
+  assert.equal(cache.peekOne('c1')?.unread_count, 0);
 });
 
 test('a page from the previous member cannot populate the next member', async () => {

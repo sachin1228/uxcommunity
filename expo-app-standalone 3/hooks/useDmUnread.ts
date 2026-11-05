@@ -46,37 +46,67 @@ let sharedUserId: string | null = null;
 let sharedCount = 0;
 let fetchedAt = 0;
 let inFlight: Promise<void> | null = null;
+/** Only the newest read may publish — see refreshShared. */
+let fetchSeq = 0;
+/** Conversations this device already cleared optimistically (user:conversation). */
+const optimisticallyRead = new Set<string>();
 const badgeListeners = new Set<() => void>();
 
 function countFor(userId: string | null): number {
   return userId !== null && sharedUserId === userId ? sharedCount : 0;
 }
 
-function publish(userId: string, count: number): void {
+function publish(userId: string, count: number, fromServer = false): void {
   if (sharedUserId !== userId) {
     sharedUserId = userId;
     sharedCount = count;
+    optimisticallyRead.clear();
   } else {
     sharedCount = count;
   }
+  // A server count is authoritative; a later open may clear its row again.
+  if (fromServer) optimisticallyRead.clear();
   fetchedAt = Date.now();
   badgeListeners.forEach((listener) => listener());
 }
 
+/**
+ * Opening a conversation clears its contribution to the badge now, before the
+ * read PATCH's acknowledgement round trip. The follow-up server read replaces
+ * this number with the truth.
+ */
+export function clearDmUnreadLocally(conversationId: string, hadUnread: boolean): void {
+  if (!hadUnread || !sharedUserId) return;
+  const key = `${sharedUserId}:${conversationId}`;
+  if (optimisticallyRead.has(key)) return;
+  optimisticallyRead.add(key);
+  publish(sharedUserId, Math.max(0, sharedCount - 1));
+}
+
 function refreshShared(userId: string, force = false): Promise<void> {
-  if (inFlight) return inFlight;
-  if (!force && sharedUserId === userId && Date.now() - fetchedAt < FRESH_MS) {
-    return Promise.resolve();
+  if (!force) {
+    if (inFlight) return inFlight;
+    if (sharedUserId === userId && Date.now() - fetchedAt < FRESH_MS) {
+      return Promise.resolve();
+    }
   }
-  inFlight = getDmUnread()
-    .then((count) => publish(userId, count))
+  // A forced read is a "something just changed" signal (a conversation was
+  // read, the app returned). It must not be answered by a request that was
+  // already in flight before that change — that response can still carry the
+  // pre-read count and would leave the badge stuck with nothing to refresh it.
+  const seq = ++fetchSeq;
+  const request = getDmUnread()
+    .then((count) => {
+      if (seq === fetchSeq) publish(userId, count, true);
+    })
     .catch(() => {
       // Keep the previous count; the next event or foreground retries.
     })
     .finally(() => {
-      inFlight = null;
+      if (inFlight === request) inFlight = null;
     });
-  return inFlight;
+  inFlight = request;
+  return request;
 }
 
 export function useDmUnread(): number {

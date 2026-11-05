@@ -19,6 +19,12 @@ export interface DmReadCoalescerOptions {
 
 export interface DmReadCoalescer {
   request(messageId: string | null | undefined, force?: boolean): void;
+  /**
+   * Send the pending read now. Leaving the thread (or backgrounding the app)
+   * would otherwise drop a trailing read queued inside the throttle window,
+   * so the conversation stayed unread after the member had seen the message.
+   */
+  flush(): void;
   cancel(): void;
 }
 
@@ -34,10 +40,12 @@ export function createDmReadCoalescer({
   let pending: string | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
 
-  const fire = () => {
+  const fire = (force = false) => {
     const messageId = pending;
     pending = null;
-    if (!messageId || messageId === lastSent) return;
+    // A forced fire may resend the last position: its PATCH can have failed
+    // after it was recorded here, and a foreground/open retry must try again.
+    if (!messageId || (!force && messageId === lastSent)) return;
     lastSent = messageId;
     lastSentAt = now();
     send(messageId);
@@ -51,16 +59,28 @@ export function createDmReadCoalescer({
     pending = null;
   };
 
+  const flush = () => {
+    if (timer !== null) {
+      clearTimeoutFn(timer);
+      timer = null;
+    }
+    fire();
+  };
+
   return {
     request(messageId, force = false) {
-      if (!messageId || messageId === lastSent) return;
+      if (!messageId) return;
+      // A forced request is a retry (open, foreground): the previous attempt
+      // may have failed after `lastSent` was recorded, so it may resend the
+      // same position.
+      if (messageId === lastSent && !force) return;
       pending = messageId;
       if (force || now() - lastSentAt > throttleMs) {
         if (timer !== null) {
           clearTimeoutFn(timer);
           timer = null;
         }
-        fire();
+        fire(force);
         return;
       }
       if (timer === null) {
@@ -70,6 +90,7 @@ export function createDmReadCoalescer({
         }, throttleMs);
       }
     },
+    flush,
     cancel,
   };
 }

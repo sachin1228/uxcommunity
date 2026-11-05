@@ -311,6 +311,33 @@ test("deduplicates stale revalidation", async () => {
   assert.equal(calls, 2)
 })
 
+test("an invalidation supersedes a read that was already in flight", async () => {
+  const url = "/api/dm/unread"
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => { release = resolve })
+  let calls = 0
+  globalThis.fetch = (async () => {
+    const value = ++calls
+    if (value === 1) await gate
+    return Response.json({ count: value })
+  }) as typeof fetch
+
+  // Started before the mutation; it answers with the pre-mutation count.
+  const stale = fetchJsonCached<{ count: number }>(url, {}, "user-a")
+  invalidateRequest(url, "user-a")
+  const fresh = fetchJsonCached<{ count: number }>(url, { force: true }, "user-a")
+
+  release()
+  assert.equal((await stale).count, 1)
+  assert.equal((await fresh).count, 2)
+  assert.equal(calls, 2, "the post-invalidation read is a new request")
+  assert.deepEqual(
+    getCachedRequest(url, "user-a"),
+    { count: 2 },
+    "the stale response must not repopulate the cache",
+  )
+})
+
 test("does not deduplicate user-specific requests across users", async () => {
   let calls = 0
   globalThis.fetch = (async () => new Response(

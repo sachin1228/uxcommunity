@@ -39,6 +39,12 @@ export function useDmThreadData({
   userId: string;
 }) {
   const [messages, setMessagesState] = useState<DmMessage[]>([]);
+  /**
+   * The conversation `messages` belong to. Read marking uses it so a render
+   * that still holds the previous thread's rows can never mark the newly
+   * opened conversation through them.
+   */
+  const [displayedConversationId, setDisplayedConversationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [initialReady, setInitialReady] = useState(false);
   const [hasMoreAbove, setHasMoreAbove] = useState(false);
@@ -114,6 +120,9 @@ export function useDmThreadData({
   useEffect(() => {
     activeIdRef.current = conversationId;
     isFetchingOlderRef.current = false;
+    // Not cleared here: the previous id can never match a different activeId,
+    // and clearing it synchronously would cascade a render. It is overwritten
+    // when this conversation's rows are painted below.
     setInitialReady(false);
     setHasMoreAbove(true);
     setLoadingOlder(false);
@@ -128,6 +137,7 @@ export function useDmThreadData({
     const cached = dmCache.getMessages(conversationId);
     if (cached && cached.length > 0) {
       setMessagesState(cached);
+      setDisplayedConversationId(conversationId);
       setHasMoreAbove(cached.length >= DM_MESSAGE_PAGE_SIZE);
       setLoading(false);
       // Paint instantly, but still catch up — events may have landed while
@@ -154,6 +164,7 @@ export function useDmThreadData({
           if (cancelled || activeIdRef.current !== conversationId) return;
           dmCache.setMessages(conversationId, page);
           setMessagesState(page);
+          setDisplayedConversationId(conversationId);
           setHasMoreAbove(page.length >= DM_MESSAGE_PAGE_SIZE);
         } catch {
           // Leave what is on screen; the load-error path is the empty thread.
@@ -217,6 +228,7 @@ export function useDmThreadData({
 
   return {
     messages,
+    displayedConversationId,
     setMessages,
     loading,
     initialReady,

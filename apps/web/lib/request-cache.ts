@@ -35,7 +35,15 @@ export const DASHBOARD_STALE_MS = {
 } as const
 const MAX_ENTRIES = 100
 const entries = new Map<string, CacheEntry<unknown>>()
-const inFlight = new Map<string, Promise<unknown>>()
+/**
+ * In-flight reads carry the cache epoch they started under. An invalidation
+ * bumps the key's epoch, so a read that began BEFORE it can no longer answer a
+ * caller that asked after it — and its late response must not repopulate the
+ * entry. Without this, a forced refresh issued right after a mutation (a DM
+ * read, for example) could be handed the mutation's pre-state.
+ */
+const inFlight = new Map<string, { promise: Promise<unknown>; epoch: number }>()
+const epochs = new Map<string, number>()
 const listeners = new Map<string, Set<() => void>>()
 let activeUserId: string | null = null
 const cacheTelemetry: Record<CacheEvent, number> = {
@@ -81,8 +89,17 @@ export function initRequestCache(userId: string) {
 export function clearRequestCache() {
   entries.clear()
   inFlight.clear()
+  epochs.clear()
   listeners.clear()
   activeUserId = null
+}
+
+function epochFor(key: string): number {
+  return epochs.get(key) ?? 0
+}
+
+function bumpEpoch(key: string) {
+  epochs.set(key, epochFor(key) + 1)
 }
 
 export function getCachedRequest<T>(url: string, userId?: string): T | undefined {
@@ -151,10 +168,11 @@ export async function fetchJsonCached<T>(
     }
   }
 
-  const pending = inFlight.get(key) as Promise<T> | undefined
-  if (pending) {
+  const requestEpoch = epochFor(key)
+  const pending = inFlight.get(key)
+  if (pending && pending.epoch === requestEpoch) {
     log("dedup", key)
-    return pending
+    return pending.promise as Promise<T>
   }
 
   if (!loggedLookup) log(cached ? "revalidate" : "miss", key)
@@ -177,15 +195,21 @@ export async function fetchJsonCached<T>(
       if (body === null) {
         throw new Error("The server returned an invalid response. Please try again.")
       }
-      entries.delete(key)
-      entries.set(key, { value: body as T, fetchedAt: Date.now() })
-      while (entries.size > MAX_ENTRIES) entries.delete(entries.keys().next().value!)
-      listeners.get(key)?.forEach((listener) => listener())
+      // An invalidation landed while this read was in flight: the caller may
+      // still use the body, but it must not become the cached snapshot.
+      if (epochFor(key) === requestEpoch) {
+        entries.delete(key)
+        entries.set(key, { value: body as T, fetchedAt: Date.now() })
+        while (entries.size > MAX_ENTRIES) entries.delete(entries.keys().next().value!)
+        listeners.get(key)?.forEach((listener) => listener())
+      }
       return body as T
     })
-    .finally(() => inFlight.delete(key))
+    .finally(() => {
+      if (inFlight.get(key)?.promise === request) inFlight.delete(key)
+    })
 
-  inFlight.set(key, request)
+  inFlight.set(key, { promise: request, epoch: requestEpoch })
   return request
 }
 
@@ -211,15 +235,20 @@ export function patchCachedRequest<T>(
 export function invalidateRequest(url: string, userId?: string) {
   const key = canonicalRequestKey(url, userId)
   entries.delete(key)
+  // Supersede any read already in flight for this key: it started before the
+  // mutation this invalidation reports, so its response cannot be reused.
+  bumpEpoch(key)
   log("invalidate", key)
   listeners.get(key)?.forEach((listener) => listener())
 }
 
 export function invalidateRequestPrefix(prefix: string, userId = activeUserId ?? "anonymous") {
   const canonicalPrefix = canonicalRequestKey(prefix, userId)
-  for (const key of entries.keys()) {
+  const keys = new Set([...entries.keys(), ...inFlight.keys()])
+  for (const key of keys) {
     if (key.startsWith(canonicalPrefix)) {
       entries.delete(key)
+      bumpEpoch(key)
       log("invalidate", key)
       listeners.get(key)?.forEach((listener) => listener())
     }

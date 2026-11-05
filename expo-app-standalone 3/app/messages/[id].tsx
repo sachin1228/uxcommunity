@@ -52,6 +52,9 @@ import { setActiveDmConversationForNotifications } from '@/lib/chatNotificationS
 import { useDmSend } from '@/hooks/useDmSend';
 import { useDmTyping } from '@/hooks/useDmTyping';
 import { chatCache } from '@/lib/chatCacheStore';
+import { peekDmMessages, rememberDmMessages } from '@/lib/dmMessageStore';
+import { takePrefetchedDmMessages } from '@/lib/dmMessagePrefetch';
+import { recordDmReadFloor } from '@/lib/dmReadFloor';
 import {
   answerDmRequest,
   blockUser,
@@ -209,9 +212,11 @@ export default function DmThreadScreen() {
     <ChatScrollView {...props} bottomInset={listInset} transition={listTransition} followThreshold={24} />
   ), [listInset, listTransition]);
   /**
-   * The thread waits for the push animation to finish before it mounts its
-   * rows — creating them mid-slide is what made the open stutter (see
-   * hooks/useScreenTransitionSettled).
+   * The unread anchor waits for the push animation to finish before it
+   * scrolls — moving the list mid-slide is what made the open stutter (see
+   * hooks/useScreenTransitionSettled). The cached window itself paints at
+   * once, like the community chat: holding it behind a spinner showed
+   * loading over content that was already available.
    */
   const listSettled = useScreenTransitionSettled();
   const { user } = useAuth();
@@ -240,11 +245,26 @@ export default function DmThreadScreen() {
       ? unstartedConversation(conversationId, peerId, peerName, params.avatar || null)
       : null),
   );
-  const [messages, setMessages] = useState<DmMessage[]>([]);
+  // A notification tap carries the message itself (or the last visit's window
+  // is still in memory): seed the first frame from it instead of a spinner.
+  const [messages, setMessages] = useState<DmMessage[]>(() =>
+    userId && conversationId
+      ? peekDmMessages(userId, conversationId) ?? []
+      : [],
+  );
   const messagesRef = useRef<DmMessage[]>([]);
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+
+  // The cold-start tap can land before auth resolves the member; seed from
+  // memory as soon as both halves of the key are known.
+  useEffect(() => {
+    if (!userId || !conversationId) return;
+    const seeded = peekDmMessages(userId, conversationId);
+    if (!seeded || seeded.length === 0) return;
+    setMessages((current) => (current.length > 0 ? current : seeded));
+  }, [conversationId, userId]);
 
   // Cold start: paint the thread's last window from disk before the page
   // request answers (see lib/chatCache.ts). The fetch below merges over it.
@@ -274,6 +294,8 @@ export default function DmThreadScreen() {
     if (!userId || !conversationId || messages.length === 0) return;
     if (dataUserIdRef.current !== userId) return;
     if (dataConversationRef.current !== conversationId) return;
+    // The next open in this session paints from here without touching disk.
+    rememberDmMessages(userId, conversationId, messages);
     pendingSaveRef.current = { userId, conversationId, messages };
     if (saveTimerRef.current) return;
     saveTimerRef.current = setTimeout(() => {
@@ -324,6 +346,7 @@ export default function DmThreadScreen() {
     previousUserRef.current = userId;
     dataUserIdRef.current = null;
     dataConversationRef.current = null;
+    readThroughRef.current = null;
     setConversation(null);
     setMessages([]);
     setInitialUnread(null);
@@ -392,6 +415,8 @@ export default function DmThreadScreen() {
     currentUserIdRef.current = userId;
   }, [userId]);
   const initialScrollDoneRef = useRef(false);
+  /** Newest position this open has reported read (for late metadata). */
+  const readThroughRef = useRef<string | null>(null);
   const atBottomRef = useRef(true);
   const listRef = useRef<FlatList<ThreadRow>>(null);
   const dmComposerRef = useRef<ChatComposerHandle>(null);
@@ -445,7 +470,8 @@ export default function DmThreadScreen() {
     previousConversationRef.current = conversationId;
     dataUserIdRef.current = null;
     dataConversationRef.current = null;
-    setMessages([]);
+    readThroughRef.current = null;
+    setMessages(peekDmMessages(userId, conversationId) ?? []);
     setConversation(peekDmConversation(conversationId));
     setInitialUnread(null);
     setHasMore(true);
@@ -470,20 +496,21 @@ export default function DmThreadScreen() {
     setLoading(true);
     setError(null);
     try {
-      const [page, conversations] = await Promise.all([
-        getDmMessages(targetId),
-        // Metadata the list screen already fetched is reused for a short
-        // window; a cold deep link still asks the server. A failed refresh
-        // must not blank a thread whose last copy is already on screen.
-        loadDmConversations().catch(() => [] as DmConversation[]),
-      ]);
+      // Opening from the list already has the conversation row in the shared
+      // cache. Re-reading the whole conversation list here put that (heavy)
+      // projection in front of the messages; a deep link or a cold cache still
+      // asks the server for it — but only in parallel, never as a gate.
+      const known = peekDmConversation(targetId);
+      const conversationsPromise = known
+        ? Promise.resolve<DmConversation[] | null>(null)
+        : loadDmConversations().catch(() => [] as DmConversation[]);
+
+      // A notification tap started this request (see dmMessagePrefetch); take
+      // that same promise instead of issuing a second one behind navigation.
+      const page = await takePrefetchedDmMessages(ownerId, targetId);
       // The route or the account changed while the page was in flight.
       if (conversationIdRef.current !== targetId) return;
       if (currentUserIdRef.current !== ownerId) return;
-      const found =
-        conversations.find((row) => row.id === targetId) ??
-        peekDmConversation(targetId) ??
-        synthesizeConversation();
       dataUserIdRef.current = ownerId;
       dataConversationRef.current = targetId;
       // Merge over the cached/hydrated window: the server page wins row by
@@ -495,23 +522,65 @@ export default function DmThreadScreen() {
         return sortMessages([...byId.values()]);
       });
       setHasMore(page.hasMore);
-      setConversation(found);
+      setLoading(false);
       lastLoadedAtRef.current = Date.now();
-      if (found && conversations.some((row) => row.id === targetId)) {
-        putDmConversation(found);
+
+      /**
+       * The unread divider needs the conversation's stored marker, which may
+       * arrive after the messages now. The locally sent read position is a
+       * floor too, so a late (pre-read) row cannot resurrect a divider over
+       * messages this open already marked.
+       */
+      const applyUnreadBoundary = (row: DmConversation | null) => {
+        setInitialUnread(null);
+        if (!row) return;
+        const readThrough = readThroughRef.current;
+        const boundary =
+          !row.my_last_read_at
+            ? readThrough
+            : !readThrough
+              ? row.my_last_read_at
+              : Date.parse(readThrough) > Date.parse(row.my_last_read_at)
+                ? readThrough
+                : row.my_last_read_at;
+        const unread = page.messages.filter(
+          (message) =>
+            message.user_id === row.peer.id &&
+            (!boundary || message.created_at > boundary),
+        );
+        if (unread.length === 0) return;
+        // The row's count may already be zeroed by the tap (or the floor);
+        // the divider still describes what was unread at open.
+        setInitialUnread({
+          id: unread[0].id,
+          count: row.unread_count > 0 ? row.unread_count : unread.length,
+        });
+      };
+
+      // Messages paint first; the list projection only decides the footer and
+      // the divider, so it lands behind them.
+      const immediate = known ?? peekDmConversation(targetId);
+      if (immediate) {
+        setConversation(immediate);
+        applyUnreadBoundary(immediate);
       }
 
-      // Snapshot the unread boundary before this open marks everything read.
-      setInitialUnread(null);
-      if (found && found.unread_count > 0) {
-        const firstUnread = page.messages.find(
-          (message) =>
-            message.user_id === found.peer.id &&
-            (!found.my_last_read_at || message.created_at > found.my_last_read_at),
-        );
-        if (firstUnread) {
-          setInitialUnread({ id: firstUnread.id, count: found.unread_count });
+      const conversations = await conversationsPromise;
+      if (conversationIdRef.current !== targetId) return;
+      if (currentUserIdRef.current !== ownerId) return;
+      const found =
+        conversations?.find((row) => row.id === targetId) ??
+        peekDmConversation(targetId) ??
+        immediate ??
+        synthesizeConversation();
+      if (found) {
+        setConversation(found);
+        if (conversations?.some((row) => row.id === targetId)) {
+          putDmConversation(found);
         }
+        // The immediate row already supplied the boundary; a late read must
+        // not make that same divider disappear under the reader.
+        if (!immediate) applyUnreadBoundary(found);
       }
     } catch (e) {
       if (conversationIdRef.current !== targetId) return;
@@ -618,22 +687,29 @@ export default function DmThreadScreen() {
   // ── Read marking: newest real (non-temp) message, coalesced ──────────────
   // One trailing PATCH carries the newest id seen, so a cache paint + page
   // merge + send in one open cannot mark an already-stale message three times.
+  const readFailedRef = useRef(false);
   const readCoalescer = useMemo(
     () =>
       createDmReadCoalescer({
         throttleMs: MARK_READ_THROTTLE_MS,
         send: (messageId) => {
+          readThroughRef.current = messageId;
           void markDmRead(conversationId, messageId)
-            .then(() => signalDmListChanged())
+            .then(() => {
+              readFailedRef.current = false;
+              // Cover messages that arrived while this thread was open: the
+              // list refetch can otherwise replay a pre-read count for them.
+              recordDmReadFloor(conversationId, messageId);
+              signalDmListChanged();
+            })
             .catch(() => {
-              /* the next message or open retries */
+              // Retried on the next message, foreground, or open.
+              readFailedRef.current = true;
             });
         },
       }),
     [conversationId, userId],
   );
-
-  useEffect(() => () => readCoalescer.cancel(), [readCoalescer, userId]);
 
   const markReadNow = useCallback(
     (force = false) => {
@@ -647,9 +723,36 @@ export default function DmThreadScreen() {
     [conversationId, messages, readCoalescer],
   );
 
+  // A ref keeps the app-state listener from re-subscribing on every message.
+  const markReadNowRef = useRef(markReadNow);
+  useEffect(() => {
+    markReadNowRef.current = markReadNow;
+  }, [markReadNow]);
+  const isFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    isFocusedRef.current = isFocused;
+  }, [isFocused]);
+
   useEffect(() => {
     markReadNow();
   }, [markReadNow]);
+
+  // Leaving the thread must not drop a read queued inside the throttle window;
+  // backgrounding is the same, because the OS may suspend the timer. Coming
+  // back to the foreground retries a marker whose PATCH failed while away.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        if (isFocusedRef.current) markReadNowRef.current(readFailedRef.current);
+      } else {
+        readCoalescer.flush();
+      }
+    });
+    return () => {
+      subscription.remove();
+      readCoalescer.flush();
+    };
+  }, [readCoalescer, userId]);
 
   // ── Catch-up after a reconnect (missed events are recovered via ?after=) ──
   const catchUp = useCallback(async () => {
@@ -1269,6 +1372,19 @@ export default function DmThreadScreen() {
     loading &&
     messages.length === 0 &&
     (!conversation || conversation.last_message_at !== null);
+  /**
+   * A quick disk read should paint directly, without a flashing spinner —
+   * same 150 ms grace the community chat uses.
+   */
+  const [showLoading, setShowLoading] = useState(false);
+  useEffect(() => {
+    if (!awaitingFirstPage) {
+      setShowLoading(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowLoading(true), 150);
+    return () => clearTimeout(timer);
+  }, [awaitingFirstPage]);
   const unstarted = conversation ? isUnstartedRequest(conversation) : false;
   const displayPeerName = conversation?.peer.name ?? peerName;
   const displayPeerAvatar = conversation?.peer.avatar_url ?? (params.avatar || null);
@@ -1396,9 +1512,15 @@ export default function DmThreadScreen() {
       </View>
 
       {awaitingFirstPage ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.accent} />
-        </View>
+        showLoading ? (
+          <View style={styles.center}>
+            <ActivityIndicator color={colors.accent} />
+          </View>
+        ) : (
+          // The disk window often lands within a frame or two; a blank beat
+          // beats a spinner flashing over messages that are already cached.
+          <View style={styles.flex} />
+        )
       ) : error && messages.length === 0 ? (
         <View style={styles.center}>
           <Feather name="wifi-off" size={28} color={colors.foregroundMuted} />
@@ -1420,16 +1542,22 @@ export default function DmThreadScreen() {
         <>
           <View style={styles.flex}>
             <View style={styles.flex}>
-            {listSettled ? (
               <FlatList
                 ref={listRef}
                 inverted
                 renderScrollComponent={renderChatScrollView}
                 data={rows}
                 keyExtractor={(row) => row.key}
-                // A cached window paints at once; the anchor runs when the page
-                // request settles and may move it to the unread divider.
-                style={[styles.flex, { opacity: initialPositionResolved || messages.length > 0 ? 1 : 0 }]}
+                // A cached window paints at once; the anchor runs when the push
+                // transition settles and may move it to the unread divider.
+                // An empty thread (no rows, nothing loading) is ready too.
+                style={[
+                  styles.flex,
+                  {
+                    opacity:
+                      initialPositionResolved || messages.length > 0 || !loading ? 1 : 0,
+                  },
+                ]}
                 contentContainerStyle={styles.list}
                 keyboardDismissMode="on-drag"
                 maintainVisibleContentPosition={atBottom ? undefined : { minIndexForVisible: 0 }}
@@ -1490,11 +1618,6 @@ export default function DmThreadScreen() {
                   </View>
                 }
               />
-            ) : (
-              <View style={styles.center}>
-                <ActivityIndicator color={colors.accent} />
-              </View>
-            )}
 
             <Animated.View
               pointerEvents="none"
@@ -1531,15 +1654,7 @@ export default function DmThreadScreen() {
             pointerEvents="box-none"
             style={[styles.dmDock, imeLayout.dockStyle]}
           >
-          <View
-            style={[
-              styles.footer,
-              {
-                borderTopColor: colors.border,
-                backgroundColor: colors.background,
-              },
-            ]}
-          >
+          <View style={[styles.footer, { backgroundColor: colors.background }]}>
             <View onLayout={imeLayout.onTypingIndicatorLayout}>
               <TypingIndicator users={typingUsers} />
             </View>
@@ -1932,7 +2047,6 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   footer: {
-    borderTopWidth: StyleSheet.hairlineWidth,
     overflow: 'visible',
   },
   footerBar: {

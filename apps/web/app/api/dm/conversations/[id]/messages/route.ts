@@ -447,6 +447,13 @@ export async function POST(
           content: inserted.content,
           hasImage: !!inserted.image_url,
           isReply: !!inserted.reply_to_id,
+          // The push carries this row so a tapped notification paints the
+          // message before the thread's first API round trip answers.
+          createdAt: inserted.created_at,
+          imageUrl: inserted.image_url,
+          replyToId: inserted.reply_to_id,
+          replySenderName,
+          replySenderId,
         }),
 
         // The request state moved with this message (first message / implicit

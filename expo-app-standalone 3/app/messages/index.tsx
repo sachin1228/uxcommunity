@@ -9,6 +9,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   FlatList,
   Pressable,
   RefreshControl,
@@ -25,7 +26,11 @@ import { DmIcon } from '@/components/DmIcon';
 import { PersonAvatar } from '@/components/PersonAvatar';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
+import { clearDmUnreadLocally } from '@/hooks/useDmUnread';
 import { useDmTyping } from '@/hooks/useDmTyping';
+import { prefetchDmMessages } from '@/lib/dmMessagePrefetch';
+import { rememberDmMessages } from '@/lib/dmMessageStore';
+import { recordDmReadFloor } from '@/lib/dmReadFloor';
 import { realtimeClient, realtimeRooms } from '@/lib/realtime';
 import {
   loadDmConversations,
@@ -34,11 +39,14 @@ import {
 } from '@/lib/dmConversationsCache';
 import { chatCache } from '@/lib/chatCacheStore';
 import {
+  bumpConversationWithMessage,
   dmConversationPreview,
   dmTimestampLabel,
   isIncomingRequest,
+  previewToDmMessage,
   unreadPillLabel,
   type DmConversation,
+  type DmRealtimeListMessage,
 } from '@/lib/dm';
 
 const REALTIME_DEBOUNCE_MS = 600;
@@ -63,6 +71,8 @@ export default function MessagesScreen() {
   const focusedOnceRef = useRef(false);
   const userIdRef = useRef(userId);
   const loadedForUserRef = useRef<string | null>(null);
+  /** Init to now: the mount's own socket connect is not a gap to recover. */
+  const lastLoadedAtRef = useRef(Date.now());
 
   const load = useCallback(async (mode: 'initial' | 'refresh' | 'silent' = 'initial') => {
     if (!userId) return;
@@ -73,6 +83,7 @@ export default function MessagesScreen() {
       const rows = await loadDmConversations({ fresh: true });
       if (userIdRef.current !== userId) return;
       loadedForUserRef.current = userId;
+      lastLoadedAtRef.current = Date.now();
       setConversations(rows);
       if (mode !== 'silent') setError(null);
     } catch (e) {
@@ -182,7 +193,22 @@ export default function MessagesScreen() {
     };
 
     const unsubscribers = [
-      realtimeClient.on(room, 'dm-message', schedule),
+      // Paint the arriving message into its row at once — the debounced
+      // refetch then reconciles the authoritative unread counts behind it.
+      realtimeClient.on(room, 'dm-message', (data) => {
+        const payload = data as Partial<DmRealtimeListMessage> | null;
+        if (
+          userId &&
+          payload?.id &&
+          payload.conversation_id &&
+          payload.user_id &&
+          payload.created_at
+        ) {
+          const message = payload as DmRealtimeListMessage;
+          setConversations((prev) => bumpConversationWithMessage(prev, userId, message));
+        }
+        schedule();
+      }),
       realtimeClient.on(room, 'dm-request-update', schedule),
       realtimeClient.on(room, 'dm-message-edit', schedule),
       realtimeClient.on(room, 'dm-message-delete', schedule),
@@ -191,8 +217,21 @@ export default function MessagesScreen() {
       realtimeClient.on(room, 'dm-reaction-delete', schedule),
     ];
 
+    // A socket reconnect (or a return from the background) may have missed
+    // events the server does not replay; the page the member saw was stale
+    // until the next new message. Refresh as soon as the connection is back
+    // and whenever the app is foregrounded.
+    const unsubscribeStatus = realtimeClient.onRoomStatus(room, (connected) => {
+      if (connected && Date.now() - lastLoadedAtRef.current > 2_000) schedule();
+    });
+    const appStateSub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void load('silent');
+    });
+
     return () => {
       unsubscribers.forEach((unsubscribe) => unsubscribe());
+      unsubscribeStatus();
+      appStateSub.remove();
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
         debounceRef.current = null;
@@ -212,6 +251,27 @@ export default function MessagesScreen() {
 
   const openThread = useCallback(
     (conversation: DmConversation) => {
+      // Clear the row and the badge before navigating, like the community
+      // list: waiting for the read PATCH left the count visible whenever the
+      // member came straight back. The floor keeps the returning refetch from
+      // resurrecting a payload produced before the marker advanced.
+      recordDmReadFloor(conversation.id, conversation.last_message_at);
+      if (conversation.unread_count > 0) {
+        setConversations((prev) =>
+          prev.map((row) =>
+            row.id === conversation.id ? { ...row, unread_count: 0 } : row,
+          ),
+        );
+        clearDmUnreadLocally(conversation.id, true);
+      }
+      // The row already carries the new message; seed the thread with it so
+      // it paints on the first frame instead of waiting for the page request.
+      if (conversation.last_message) {
+        rememberDmMessages(userId, conversation.id, [
+          previewToDmMessage(conversation.last_message, conversation.peer, user),
+        ]);
+      }
+      prefetchDmMessages(userId, conversation.id);
       router.push({
         pathname: '/messages/[id]',
         params: {
@@ -222,7 +282,7 @@ export default function MessagesScreen() {
         },
       });
     },
-    [router],
+    [router, user, userId],
   );
 
   return (
@@ -354,7 +414,6 @@ function ConversationRow({
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
-        { borderBottomColor: colors.border },
         pressed && { backgroundColor: colors.surfaceRaised },
       ]}
     >
@@ -453,7 +512,6 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 16,
     paddingVertical: 13,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   rowBody: { flex: 1, minWidth: 0, gap: 3 },
   rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },

@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  bumpConversationWithMessage,
   dmComposerState,
   dmConversationPreview,
   dmTimestampLabel,
@@ -14,6 +15,7 @@ import {
   isOutgoingRequest,
   isUnstartedRequest,
   newestMessageAt,
+  previewToDmMessage,
   requestHintForPeer,
   unreadPillLabel,
   uuidV4,
@@ -210,14 +212,28 @@ test('unread pill caps at 99+', () => {
   assert.equal(unreadPillLabel(150), '99+');
 });
 
-test('timestamp buckets match the rest of the app', () => {
+test('the list stamp matches the community rows', () => {
   const now = Date.parse('2026-01-10T12:00:00.000Z');
   const at = (offsetMs: number) => new Date(now - offsetMs).toISOString();
 
-  assert.equal(dmTimestampLabel(at(10_000), now), 'now');
-  assert.equal(dmTimestampLabel(at(5 * 60_000), now), '5m');
-  assert.equal(dmTimestampLabel(at(3 * 3_600_000), now), '3h');
-  assert.equal(dmTimestampLabel(at(2 * 86_400_000), now), '2d');
+  const today = new Date(now - 10_000);
+  assert.equal(
+    dmTimestampLabel(at(10_000), now),
+    today.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  );
+  assert.equal(dmTimestampLabel(at(86_400_000), now), 'Yesterday');
+
+  const weekday = new Date(now - 3 * 86_400_000);
+  assert.equal(
+    dmTimestampLabel(at(3 * 86_400_000), now),
+    weekday.toLocaleDateString([], { weekday: 'short' }),
+  );
+
+  const older = new Date(now - 10 * 86_400_000);
+  assert.equal(
+    dmTimestampLabel(at(10 * 86_400_000), now),
+    older.toLocaleDateString([], { month: 'short', day: 'numeric' }),
+  );
   assert.equal(dmTimestampLabel(null, now), '');
 });
 
@@ -259,4 +275,81 @@ test('newestMessageAt finds the latest message regardless of order', () => {
     '2026-01-03T00:00:00.000Z',
   );
   assert.equal(newestMessageAt([]), null);
+});
+
+// ---------------------------------------------------------------------------
+// Live list bump
+// ---------------------------------------------------------------------------
+
+test('an incoming message moves its row to the top and bumps unread', () => {
+  const rows = [conversation({ id: 'c1' }), conversation({ id: 'c2' })];
+  const next = bumpConversationWithMessage(rows, VIEWER, {
+    id: 'm1',
+    conversation_id: 'c2',
+    user_id: PEER,
+    content: 'hello',
+    image_url: null,
+    created_at: '2026-01-02T00:00:00.000Z',
+  });
+
+  assert.deepEqual(next.map((row) => row.id), ['c2', 'c1']);
+  assert.equal(next[0].unread_count, 1);
+  assert.equal(next[0].last_message?.content, 'hello');
+  assert.equal(next[0].last_message_at, '2026-01-02T00:00:00.000Z');
+});
+
+test('an own message refreshes the preview without counting unread', () => {
+  const [row] = bumpConversationWithMessage(
+    [conversation({ unread_count: 2 })],
+    VIEWER,
+    {
+      id: 'm1',
+      conversation_id: 'c1',
+      user_id: VIEWER,
+      content: 'mine',
+      created_at: '2026-01-02T00:00:00.000Z',
+    },
+  );
+  assert.equal(row.unread_count, 2);
+  assert.equal(row.last_message?.content, 'mine');
+});
+
+test('the list preview becomes a thread row with the right author', () => {
+  const last = {
+    id: 'm-1',
+    content: 'hi',
+    image_url: null,
+    created_at: '2026-11-05T10:00:00Z',
+    user_id: PEER,
+    deleted_at: null,
+    edited_at: null,
+  };
+  const fromPeer = previewToDmMessage(last, { id: PEER, name: 'Ada', avatar_url: null }, {
+    id: VIEWER,
+    name: 'Me',
+    avatar_url: null,
+  });
+  assert.equal(fromPeer.users?.name, 'Ada');
+  assert.equal(fromPeer.content, 'hi');
+
+  const fromViewer = previewToDmMessage(
+    { ...last, user_id: VIEWER },
+    { id: PEER, name: 'Ada', avatar_url: null },
+    { id: VIEWER, name: 'Me', avatar_url: null },
+  );
+  assert.equal(fromViewer.users?.name, 'Me');
+});
+
+test('a message for an unknown conversation leaves the list untouched', () => {
+  const rows = [conversation({ id: 'c1' })];
+  assert.equal(
+    bumpConversationWithMessage(rows, VIEWER, {
+      id: 'm1',
+      conversation_id: 'c-unknown',
+      user_id: PEER,
+      content: 'hello',
+      created_at: '2026-01-02T00:00:00.000Z',
+    }),
+    rows,
+  );
 });

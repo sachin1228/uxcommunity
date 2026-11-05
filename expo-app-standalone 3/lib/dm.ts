@@ -202,21 +202,103 @@ export function unreadPillLabel(count: number): string {
   return count > 99 ? '99+' : String(count);
 }
 
-/** "2h" / "3d" / "12 Oct" — the list row's stamp (web timeAgo-style buckets). */
+/**
+ * The list row's newest message, shaped for the thread. Opening a chat can
+ * therefore paint the message the row already shows before the page request
+ * answers — the same instant-open the community chat gets from its push
+ * snapshot. The page then replaces this row with the full one.
+ */
+export function previewToDmMessage(
+  last: DmLastMessage,
+  peer: DmPeer,
+  viewer: { id: string; name?: string | null; avatar_url?: string | null } | null,
+): DmMessage {
+  const fromPeer = last.user_id === peer.id;
+  const fromViewer = !!viewer && last.user_id === viewer.id;
+  return {
+    id: last.id,
+    content: last.content,
+    created_at: last.created_at,
+    user_id: last.user_id,
+    reply_to_id: null,
+    image_url: last.image_url,
+    deleted_at: last.deleted_at,
+    edited_at: last.edited_at,
+    users: fromPeer
+      ? { name: peer.name, avatar_url: peer.avatar_url, designation: null }
+      : fromViewer
+        ? {
+            name: viewer.name ?? 'You',
+            avatar_url: viewer.avatar_url ?? null,
+            designation: null,
+          }
+        : null,
+    reactions: [],
+    reply_to: null,
+    status: 'sent',
+  };
+}
+
+/** The fields of a `dm-message` realtime event the list row previews. */
+export interface DmRealtimeListMessage {
+  id: string;
+  conversation_id: string;
+  user_id: string;
+  content?: string | null;
+  image_url?: string | null;
+  created_at: string;
+}
+
+/**
+ * Fold a live message into the list immediately — the row must not wait for
+ * the debounced refetch to show what the push already announced. Returns the
+ * same array for a conversation the list has not seen yet (the caller then
+ * refreshes, because only the server knows the peer's identity).
+ */
+export function bumpConversationWithMessage(
+  conversations: DmConversation[],
+  viewerId: string,
+  message: DmRealtimeListMessage,
+): DmConversation[] {
+  const current = conversations.find((row) => row.id === message.conversation_id);
+  if (!current) return conversations;
+  const isOwn = message.user_id === viewerId;
+  const bumped: DmConversation = {
+    ...current,
+    last_message: {
+      id: message.id,
+      content: message.content?.trim() ? message.content : null,
+      image_url: message.image_url ?? null,
+      created_at: message.created_at,
+      user_id: message.user_id,
+      deleted_at: null,
+      edited_at: null,
+    },
+    last_message_at: message.created_at,
+    // A message is newer activity than any reaction.
+    last_reaction: null,
+    unread_count: isOwn ? current.unread_count : current.unread_count + 1,
+  };
+  return [bumped, ...conversations.filter((row) => row.id !== current.id)];
+}
+
+/**
+ * The list row's stamp, matching the community rows: a clock time today,
+ * "Yesterday", a weekday inside the week, then a short date.
+ */
 export function dmTimestampLabel(iso: string | null, now: number = Date.now()): string {
   if (!iso) return '';
   const at = Date.parse(iso);
   if (!Number.isFinite(at)) return '';
-  const diff = now - at;
-  const minute = 60_000;
-  const hour = 60 * minute;
-  const day = 24 * hour;
+  const date = new Date(at);
+  const daysAgo = Math.floor((now - at) / 86_400_000);
 
-  if (diff < minute) return 'now';
-  if (diff < hour) return `${Math.floor(diff / minute)}m`;
-  if (diff < day) return `${Math.floor(diff / hour)}h`;
-  if (diff < 7 * day) return `${Math.floor(diff / day)}d`;
-  return new Date(at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  if (daysAgo <= 0) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  if (daysAgo === 1) return 'Yesterday';
+  if (daysAgo < 7) return date.toLocaleDateString([], { weekday: 'short' });
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
 /** Client nonce for send idempotency — the server only needs UUID shape. */

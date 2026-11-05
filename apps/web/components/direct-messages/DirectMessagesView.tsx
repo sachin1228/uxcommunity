@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ImageLightbox, type LightboxImage } from "@/components/communities/chat/ImageLightbox";
 import { DmIcon } from "@/components/ui/DmIcon";
 import { MAX_MESSAGE_CHARS } from "@/components/communities/chat/chatUtils";
+import { useDocumentVisible } from "@/lib/use-document-visible";
 import { invalidateRequest, patchCachedRequest } from "@/lib/request-cache";
 import { bumpConversationWithMessage } from "@/lib/direct-messages/client-cache";
 import { dmUrls } from "@/lib/direct-messages/client";
@@ -105,6 +106,12 @@ export function DirectMessagesView({
   useEffect(() => {
     activeIdRef.current = activeId;
   }, [activeId]);
+
+  /** Newest displayed position already reported read in this open. */
+  const markedThroughRef = useRef<{ conversationId: string | null; through: number }>({
+    conversationId: null,
+    through: 0,
+  });
 
   // The ?peer= handoff has been flushed into state (initialConversation);
   // strip it from the URL so a refresh lands on the plain window and a later
@@ -412,39 +419,61 @@ export function DirectMessagesView({
   // this open has acknowledged so a stale payload cannot bring the count back,
   // and the cached list is patched so a refetch inside the stale window
   // doesn't replay the pre-read payload either.
-  useEffect(() => {
-    if (!activeId) return;
-    const opened = conversationsRef.current?.find((c) => c.id === activeId);
-    if (opened?.last_message_at) recordReadFloor(activeId, opened.last_message_at);
+  //
+  // The topbar badge is a conversation count, so this conversation's row
+  // contributes exactly one; decrementing its cache entry makes the icon
+  // clear with the row instead of after the PATCH acknowledgement.
+  const clearUnreadOnOpen = useCallback(
+    (conversationId: string) => {
+      const opened = conversationsRef.current?.find((c) => c.id === conversationId);
+      if (opened?.last_message_at) recordReadFloor(conversationId, opened.last_message_at);
+      if (opened && opened.unread_count > 0) {
+        patchCachedRequest<{ count: number }>(
+          dmUrls.unread,
+          (current) => ({ count: Math.max(0, (current?.count ?? 0) - 1) }),
+          userId,
+        );
+      }
 
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === activeId && c.unread_count !== 0 ? { ...c, unread_count: 0 } : c,
-      ),
-    );
-    patchCachedRequest<{ conversations?: DmConversationSummary[] }>(
-      dmUrls.conversations,
-      (current) => ({
-        ...current,
-        conversations: (current?.conversations ?? []).map((c) =>
-          c.id === activeId ? { ...c, unread_count: 0 } : c,
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === conversationId && c.unread_count !== 0 ? { ...c, unread_count: 0 } : c,
         ),
-      }),
-      userId,
-    );
-  }, [activeId, setConversations, userId]);
+      );
+      patchCachedRequest<{ conversations?: DmConversationSummary[] }>(
+        dmUrls.conversations,
+        (current) => ({
+          ...current,
+          conversations: (current?.conversations ?? []).map((c) =>
+            c.id === conversationId ? { ...c, unread_count: 0 } : c,
+          ),
+        }),
+        userId,
+      );
+    },
+    [setConversations, userId],
+  );
+
+  useEffect(() => {
+    if (activeId) clearUnreadOnOpen(activeId);
+  }, [activeId, clearUnreadOnOpen]);
 
   // Report the conversation read once its messages are on screen — up to the
   // newest DISPLAYED message, because "now" could swallow one that raced the
   // request. Re-arms whenever that newest timestamp advances, so a first mark
   // made from a partly-loaded page can never wedge the marker; the read
   // manager debounces and cools down the follow-up requests.
-  const markedThroughRef = useRef<{ conversationId: string | null; through: number }>({
-    conversationId: null,
-    through: 0,
-  });
+  //
+  // A cache paint is on screen too: waiting for `initialReady` (the catch-up
+  // fetch) meant opening a cached thread and leaving before the network
+  // answered never marked it at all, and the unread badge came straight back.
+  // The rows must belong to THIS conversation — a switch still holds the
+  // previous thread's rows for one render — and the tab must be visible,
+  // because a hidden tab is not reading anything.
+  const isDocumentVisible = useDocumentVisible();
   useEffect(() => {
-    if (!activeId || !thread.initialReady) return;
+    if (!activeId || !isDocumentVisible) return;
+    if (thread.displayedConversationId !== activeId) return;
     const newest = newestRealMessage(thread.messages);
     if (!newest) return;
     const through = new Date(newest.created_at).getTime();
@@ -456,7 +485,7 @@ export function DirectMessagesView({
       immediate: isFirstMarkThisOpen,
       lastReadAt: newest.created_at,
     });
-  }, [activeId, thread.initialReady, thread.messages]);
+  }, [activeId, isDocumentVisible, thread.displayedConversationId, thread.messages]);
 
   useEffect(() => {
     return onConversationRead((conversationId, markedAt) => {
@@ -498,6 +527,13 @@ export function DirectMessagesView({
 
   // ── Opening a conversation ────────────────────────────────────────────────
   const openConversation = useCallback((conversationId: string) => {
+    // A new open starts a fresh marking session. Without this, reopening the
+    // same conversation returned early on the previous session's watermark, so
+    // a read PATCH that failed (or was cut off) was never retried.
+    markedThroughRef.current = { conversationId: null, through: 0 };
+    // Clear in the click itself, not one effect later: coming straight back
+    // to the list must never show the count the member just consumed.
+    clearUnreadOnOpen(conversationId);
     setActiveId(conversationId);
     setActionError(null);
     // Seed the fallback copy with what the list knows: once a refetch drops
@@ -510,7 +546,7 @@ export function DirectMessagesView({
       return prev && prev.id === conversationId ? prev : null;
     });
     setLightboxIndex(null);
-  }, []);
+  }, [clearUnreadOnOpen]);
 
   // Leaving the thread drops it and any lifecycle error that belonged to it.
   const closeConversation = useCallback(() => {

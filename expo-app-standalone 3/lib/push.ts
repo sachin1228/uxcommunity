@@ -91,6 +91,10 @@ export interface DirectMessagePushData {
   senderId?: string;
   senderName?: string | null;
   senderAvatarUrl?: string | null;
+  /** The signed-in recipient, for validating the carried snapshot. */
+  recipientId?: string;
+  /** The complete message row (JSON), so a tap paints before the API answers. */
+  dmMessage?: string;
   /** True when the server chose not to buzz for this one. */
   silent?: boolean;
 }
