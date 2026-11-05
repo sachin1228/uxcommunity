@@ -32,7 +32,7 @@ import {
   setCommunityMute,
 } from '@/lib/communities';
 import { communityStore } from '@/lib/communityStore';
-import { communityMuteLabel, isCommunityMuted } from '@/lib/communityMute';
+import { isCommunityMuted } from '@/lib/communityMute';
 import { hapticImpact, hapticSelection } from '@/lib/haptics';
 import { useAuth } from '@/context/AuthContext';
 import { prefetchCommunityMessages } from '@/lib/communityMessageStoreRuntime';
@@ -59,18 +59,21 @@ interface ListToast {
 /**
  * WhatsApp's selection toolbar. Holding a chat row replaces the workspace
  * header with the selected count and the actions that apply to it; the only
- * action here is the mute toggle, which reuses the chat header's ⋯ menu flow
- * (unmute in place when already muted, otherwise the duration sheet).
+ * action here is mute, which reuses the chat header's ⋯ menu durations.
+ *
+ * A selection that includes an already-muted chat cannot be muted again, so
+ * the bell gives way to a hint asking for that chat to be deselected — the
+ * remaining chats can then be muted together.
  */
 function ChatSelectionHeader({
   count,
-  muted,
+  includesMuted,
   busy,
   onClose,
   onMute,
 }: {
   count: number;
-  muted: boolean;
+  includesMuted: boolean;
   busy: boolean;
   onClose: () => void;
   onMute: () => void;
@@ -105,28 +108,39 @@ function ChatSelectionHeader({
           {count}
         </Text>
       </View>
-      <Pressable
-        onPress={onMute}
-        disabled={busy}
-        hitSlop={6}
-        accessibilityRole="button"
-        accessibilityLabel={muted ? 'Unmute notifications' : 'Mute notifications'}
-        style={({ pressed }) => [
-          styles.headerIconBtn,
-          { opacity: busy ? 0.5 : pressed ? 0.7 : 1 },
-        ]}
-      >
-        {busy ? (
-          <ActivityIndicator size="small" color={colors.foreground} />
-        ) : (
-          <Feather
-            name={muted ? 'bell' : 'bell-off'}
-            size={20}
-            strokeWidth={2.25}
-            color={colors.foreground}
-          />
-        )}
-      </Pressable>
+      {includesMuted ? (
+        <Text
+          accessible
+          accessibilityLabel="Already muted — deselect it to mute the other chats"
+          numberOfLines={1}
+          style={[styles.selectionHint, { color: colors.mutedForeground }]}
+        >
+          Already muted — deselect it
+        </Text>
+      ) : (
+        <Pressable
+          onPress={onMute}
+          disabled={busy}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel="Mute notifications"
+          style={({ pressed }) => [
+            styles.headerIconBtn,
+            { opacity: busy ? 0.5 : pressed ? 0.7 : 1 },
+          ]}
+        >
+          {busy ? (
+            <ActivityIndicator size="small" color={colors.foreground} />
+          ) : (
+            <Feather
+              name="bell-off"
+              size={20}
+              strokeWidth={2.25}
+              color={colors.foreground}
+            />
+          )}
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -154,8 +168,8 @@ export default function CommunitiesScreen() {
   const [notificationNoticeDismissed, setNotificationNoticeDismissed] = useState(false);
   const notificationPromptShownRef = useRef(false);
 
-  /** The row claimed by a long press; null while the list is not selecting. */
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  /** Rows claimed by selection; empty while the list is not selecting. */
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   /** The selection toolbar's mute row opens the duration sheet. */
   const [muteSheetOpen, setMuteSheetOpen] = useState(false);
   const [muteBusy, setMuteBusy] = useState(false);
@@ -182,37 +196,51 @@ export default function CommunitiesScreen() {
     [],
   );
 
-  const selectedCommunity = useMemo(
-    () => (selectedId ? communities.find((c) => c.id === selectedId) ?? null : null),
-    [communities, selectedId],
+  const selectionActive = selectedIds.size > 0;
+  const selectedCommunities = useMemo(
+    () => communities.filter((c) => selectedIds.has(c.id)),
+    [communities, selectedIds],
   );
-  const selectionActive = selectedCommunity !== null;
-  const selectedMuted = isCommunityMuted(selectedCommunity, nowMs);
+  // A chat that is already muted cannot be muted again, so one in the
+  // selection retires the toolbar's bell in favour of a hint.
+  const selectionIncludesMuted = selectedCommunities.some((c) =>
+    isCommunityMuted(c, nowMs),
+  );
 
   const exitSelection = useCallback(() => {
-    setSelectedId(null);
+    setSelectedIds(new Set());
     setMuteSheetOpen(false);
   }, []);
 
   const handleSelect = useCallback((community: Community) => {
     hapticSelection();
-    setSelectedId((current) => (current === community.id ? null : community.id));
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(community.id)) next.delete(community.id);
+      else next.add(community.id);
+      return next;
+    });
   }, []);
 
   const handleLongPress = useCallback((community: Community) => {
     hapticImpact();
     setMuteSheetOpen(false);
-    setSelectedId(community.id);
+    setSelectedIds((current) => {
+      if (current.has(community.id)) return current;
+      return new Set(current).add(community.id);
+    });
   }, []);
 
-  // A row removed elsewhere (Exit community on another device, an archive)
-  // takes the selection with it.
+  // Rows removed elsewhere (Exit community on another device, an archive)
+  // take their selection with them.
   useEffect(() => {
-    if (selectedId && !communities.some((c) => c.id === selectedId)) {
-      setSelectedId(null);
-      setMuteSheetOpen(false);
-    }
-  }, [communities, selectedId]);
+    if (selectedIds.size === 0) return;
+    const alive = new Set(communities.map((c) => c.id));
+    const next = new Set([...selectedIds].filter((id) => alive.has(id)));
+    if (next.size === selectedIds.size) return;
+    setSelectedIds(next);
+    if (next.size === 0) setMuteSheetOpen(false);
+  }, [communities, selectedIds]);
 
   // Android's back button leaves selection before it leaves the tab.
   useEffect(() => {
@@ -228,7 +256,7 @@ export default function CommunitiesScreen() {
   useFocusEffect(
     useCallback(
       () => () => {
-        setSelectedId(null);
+        setSelectedIds(new Set());
         setMuteSheetOpen(false);
       },
       [],
@@ -236,37 +264,65 @@ export default function CommunitiesScreen() {
   );
 
   /**
-   * Save the caller's mute for one chat and confirm with a toast — "Chat
-   * muted" with an Undo, "Chat unmuted" as a plain notice. The same endpoint,
-   * patch and copy the community chat's ⋯ menu uses; the row updates through
-   * the shared store the moment the save lands.
+   * Save the caller's mute for every selected chat and confirm with one
+   * toast — "Chat muted"/"3 chats muted" with Undo, and the same in the
+   * plural for unmute. Failures leave just the failed rows selected so a
+   * retry is one tap away; successful rows still patch through the shared
+   * store the moment each save lands.
    */
   const applyMute = useCallback(
     async (
-      communityId: string,
+      communityIds: string[],
       duration: CommunityMuteDuration,
       { reportFailure = true }: { reportFailure?: boolean } = {},
     ): Promise<boolean> => {
-      if (muteBusy) return false;
+      if (muteBusy || communityIds.length === 0) return false;
       setMuteBusy(true);
       try {
-        const state = await setCommunityMute(communityId, duration);
-        communityStore.notifyCommunityChanged({ kind: 'patch', communityId, patch: state });
+        const results = await Promise.allSettled(
+          communityIds.map((communityId) => setCommunityMute(communityId, duration)),
+        );
+        const succeeded: string[] = [];
+        const failed: string[] = [];
+        results.forEach((result, index) => {
+          const communityId = communityIds[index];
+          if (result.status === 'fulfilled') {
+            communityStore.notifyCommunityChanged({
+              kind: 'patch',
+              communityId,
+              patch: result.value,
+            });
+            succeeded.push(communityId);
+          } else {
+            failed.push(communityId);
+          }
+        });
+
+        if (failed.length > 0) {
+          setMuteSheetOpen(false);
+          if (reportFailure) {
+            setSelectedIds(new Set(failed));
+            showToast({ message: "Couldn't update notifications. Try again." });
+          }
+          return false;
+        }
+
+        const count = succeeded.length;
         if (duration === 'off') {
-          showToast({ message: 'Chat unmuted' });
+          showToast({ message: count === 1 ? 'Chat unmuted' : `${count} chats unmuted` });
         } else {
           showToast({
-            message: 'Chat muted',
+            message: count === 1 ? 'Chat muted' : `${count} chats muted`,
             actionLabel: 'Undo',
             onAction: async () => {
-              if (!(await applyMute(communityId, 'off', { reportFailure: false }))) {
+              if (!(await applyMute(succeeded, 'off', { reportFailure: false }))) {
                 throw new Error('undo failed');
               }
             },
           });
         }
         setMuteSheetOpen(false);
-        setSelectedId(null);
+        setSelectedIds(new Set());
         return true;
       } catch {
         if (reportFailure) {
@@ -283,13 +339,9 @@ export default function CommunitiesScreen() {
   );
 
   const handleSelectionMute = useCallback(() => {
-    if (!selectedCommunity) return;
-    if (isCommunityMuted(selectedCommunity, nowMs)) {
-      void applyMute(selectedCommunity.id, 'off');
-    } else {
-      setMuteSheetOpen(true);
-    }
-  }, [applyMute, nowMs, selectedCommunity]);
+    if (muteBusy || selectedCommunities.length === 0) return;
+    setMuteSheetOpen(true);
+  }, [muteBusy, selectedCommunities.length]);
 
   const handleToastAction = useCallback(() => {
     const action = toast?.onAction;
@@ -411,8 +463,8 @@ export default function CommunitiesScreen() {
         onPress={() => handleCommunityPress(item)}
         onPressIn={() => prefetchCommunityMessages(user?.id, item.id)}
         onPressAvatar={() => setPhotoCommunity(item)}
-        selectionMode={selectedId !== null}
-        selected={selectedId === item.id}
+        selectionMode={selectionActive}
+        selected={selectedIds.has(item.id)}
         onLongPress={() => handleLongPress(item)}
         onSelect={() => handleSelect(item)}
       />
@@ -423,7 +475,8 @@ export default function CommunitiesScreen() {
       handleLongPress,
       handleSelect,
       nowMs,
-      selectedId,
+      selectedIds,
+      selectionActive,
       user?.id,
     ],
   );
@@ -433,8 +486,8 @@ export default function CommunitiesScreen() {
       <StatusBar style={colors.isDark ? 'light' : 'dark'} />
       {selectionActive ? (
         <ChatSelectionHeader
-          count={1}
-          muted={selectedMuted}
+          count={selectedCommunities.length}
+          includesMuted={selectionIncludesMuted}
           busy={muteBusy}
           onClose={exitSelection}
           onMute={handleSelectionMute}
@@ -582,15 +635,20 @@ export default function CommunitiesScreen() {
         onClose={() => setNotificationPromptOpen(false)}
       />
 
-      {/* Mute durations for the selected row — the chat header's ⋯ menu sheet,
-          opened from the selection toolbar. */}
+      {/* Mute durations for the selected rows — the chat header's ⋯ menu
+          sheet, opened from the selection toolbar. */}
       <CommunityMuteSheet
         open={muteSheetOpen}
-        muted={selectedMuted}
-        muteStateLabel={communityMuteLabel(selectedCommunity, nowMs)}
+        muted={false}
+        muteStateLabel={null}
         busy={muteBusy}
         onChoose={(duration) => {
-          if (selectedCommunity) void applyMute(selectedCommunity.id, duration);
+          if (selectedCommunities.length > 0) {
+            void applyMute(
+              selectedCommunities.map((community) => community.id),
+              duration,
+            );
+          }
         }}
         onClose={() => {
           if (!muteBusy) setMuteSheetOpen(false);
@@ -634,6 +692,13 @@ const styles = StyleSheet.create({
   selectionCount: {
     fontSize: 18,
     fontFamily: 'Geist_600SemiBold',
+  },
+  selectionHint: {
+    flexShrink: 1,
+    maxWidth: '60%',
+    fontSize: 12,
+    fontFamily: 'Geist_500Medium',
+    textAlign: 'right',
   },
 
   searchRow: {
