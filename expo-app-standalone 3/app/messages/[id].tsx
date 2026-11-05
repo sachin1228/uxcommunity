@@ -15,6 +15,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useIsFocused } from '@react-navigation/native';
 import {
   ActivityIndicator,
+  AppState,
   FlatList,
   Modal,
   Pressable,
@@ -181,16 +182,27 @@ export default function DmThreadScreen() {
   const imeLayout = useChatImeLayout(isFocused, { nativeListInsets: true });
   /** Rows currently on screen — animated emoji only fetch/play while visible. */
   const visibilityStore = useRef(createMessageVisibilityStore()).current;
+  const visibleRowKeys = useRef(new Set<string>());
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      visibilityStore.setVisible(
-        new Set(viewableItems.map((token) => String(token.key))),
+      visibleRowKeys.current = new Set(
+        viewableItems.map((token) => String(token.key)),
       );
+      visibilityStore.setVisible(visibleRowKeys.current);
     },
   ).current;
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 1 }).current;
   useEffect(() => {
     if (!isFocused) visibilityStore.setVisible(new Set());
+  }, [isFocused, visibilityStore]);
+  // Backgrounding the app must stop emoji too, not just scrolling them away.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      visibilityStore.setVisible(
+        state === 'active' && isFocused ? visibleRowKeys.current : new Set(),
+      );
+    });
+    return () => subscription.remove();
   }, [isFocused, visibilityStore]);
   const { listInset, listTransition } = imeLayout;
   const renderChatScrollView = useCallback((props: ScrollViewProps) => (
