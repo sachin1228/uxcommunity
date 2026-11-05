@@ -10,6 +10,7 @@ import {
 import Animated, { type AnimatedStyle } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 import { useColors } from '@/hooks/useColors';
+import { NotoEmojiSvg } from './NotoEmojiSvg';
 
 /**
  * Composer emoji picker — the React Native counterpart of the web
@@ -172,7 +173,7 @@ export function EmojiPicker({
                           { backgroundColor: pressed ? colors.subtle : 'transparent' },
                         ]}
                       >
-                        <Text style={styles.emoji}>{emoji}</Text>
+                        <NotoEmojiSvg emoji={emoji} size={24} />
                       </Pressable>
                     ))}
                   </View>
@@ -216,12 +217,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 10,
-  },
-  emoji: {
-    fontSize: 24,
-    lineHeight: 30,
-    textAlign: 'center',
-    textAlignVertical: 'center',
-    includeFontPadding: false,
   },
 });

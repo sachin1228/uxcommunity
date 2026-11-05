@@ -1,9 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef, memo } from "react";
-import Lottie, { type LottieRefCurrentProps } from "lottie-react";
+import { Suspense, lazy, useState, useEffect, useRef, memo } from "react";
+import type { LottieRefCurrentProps } from "lottie-react";
 import { emojiToCodepoint, lottieUrlForCodepoint } from "@/lib/noto-emoji";
 import { NotoEmojiSvg } from "./NotoEmojiSvg";
+
+// Lazy-load the Lottie player (~77 KB gzipped) so it is not part of the
+// community route bundle. The static SVG renders as the Suspense fallback
+// until the player chunk arrives.
+const Lottie = lazy(() => import("lottie-react"));
 
 interface AnimatedEmojiProps {
   /** The emoji character to render */
@@ -18,8 +23,37 @@ interface AnimatedEmojiProps {
 
 // Cache for Lottie animation data (shared across all instances)
 const lottieCache = new Map<string, unknown>();
+// One in-flight request per codepoint: twenty copies of the same emoji on
+// screen must not fire twenty identical fetches.
+const lottieInflight = new Map<string, Promise<unknown | null>>();
 // Track failed codepoints to avoid retrying
 const failedCodepoints = new Set<string>();
+
+async function fetchLottie(codepoint: string): Promise<unknown | null> {
+  const pending = lottieInflight.get(codepoint);
+  if (pending) return pending;
+
+  const request = (async () => {
+    try {
+      const response = await fetch(lottieUrlForCodepoint(codepoint));
+      if (!response.ok) {
+        failedCodepoints.add(codepoint);
+        return null;
+      }
+      const data = await response.json();
+      lottieCache.set(codepoint, data);
+      return data;
+    } catch {
+      failedCodepoints.add(codepoint);
+      return null;
+    } finally {
+      lottieInflight.delete(codepoint);
+    }
+  })();
+
+  lottieInflight.set(codepoint, request);
+  return request;
+}
 
 /** Extra pixels around the viewport where an emoji counts as "visible". */
 const VISIBILITY_ROOT_MARGIN = "200px";
@@ -80,25 +114,16 @@ export const AnimatedEmoji = memo(function AnimatedEmoji({
       return;
     }
 
+    let cancelled = false;
     const loadAnimation = async () => {
-      try {
-        const url = lottieUrlForCodepoint(codepoint);
-        const response = await fetch(url);
-
-        if (!response.ok) {
-          failedCodepoints.add(codepoint);
-          return;
-        }
-
-        const data = await response.json();
-        lottieCache.set(codepoint, data);
-        setAnimationData(data);
-      } catch {
-        failedCodepoints.add(codepoint);
-      }
+      const data = await fetchLottie(codepoint);
+      if (!cancelled && data) setAnimationData(data);
     };
 
     loadAnimation();
+    return () => {
+      cancelled = true;
+    };
   }, [codepoint, hoverOnly, isHovered, isVisible]);
 
   const shouldPlay = hoverOnly ? isHovered : isVisible;
@@ -126,13 +151,19 @@ export const AnimatedEmoji = memo(function AnimatedEmoji({
       onMouseLeave={() => setIsHovered(false)}
     >
       {animationData ? (
-        <Lottie
-          lottieRef={lottieRef}
-          animationData={animationData}
-          style={{ width: size, height: size }}
-          loop
-          autoplay={shouldPlay}
-        />
+        <Suspense
+          fallback={
+            <NotoEmojiSvg emoji={emoji} size={size} className={className} />
+          }
+        >
+          <Lottie
+            lottieRef={lottieRef}
+            animationData={animationData}
+            style={{ width: size, height: size }}
+            loop
+            autoplay={shouldPlay}
+          />
+        </Suspense>
       ) : (
         // Fallback to SVG image (not system font)
         <NotoEmojiSvg

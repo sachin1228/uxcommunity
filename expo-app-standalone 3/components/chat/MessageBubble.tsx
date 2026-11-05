@@ -39,6 +39,10 @@ import {
 } from '@/lib/chatTruncation';
 import { MessageBubbleTail } from './MessageBubbleTail';
 import { CheckCheckIcon } from './CheckCheckIcon';
+import { AnimatedEmoji } from './AnimatedEmoji';
+import { useMessageVisibility } from './useMessageVisibility';
+import { splitTextEmojiRuns } from '@/lib/notoEmoji';
+import type { MessageVisibilityStore } from '@/lib/messageVisibility';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -72,6 +76,8 @@ interface Props {
    * 'dm' — the classic two-sided layout (own right, time in a footer).
    */
   variant?: 'community' | 'dm';
+  /** Chat-list viewport gate: emoji only animate while this row is on screen. */
+  visibility?: MessageVisibilityStore;
 }
 
 type Palette = ReturnType<typeof useColors>;
@@ -91,12 +97,14 @@ function ReactionPills({
   messageId,
   onReactionPress,
   colors,
+  play,
 }: {
   reactions: Reaction[];
   currentUserId: string;
   messageId: string;
   onReactionPress: (messageId: string, emoji: string) => void;
   colors: Palette;
+  play: boolean;
 }) {
   if (!reactions || reactions.length === 0) return null;
 
@@ -120,7 +128,7 @@ function ReactionPills({
               },
             ]}
           >
-            <Text style={styles.reactionPillEmoji}>{emoji}</Text>
+            <AnimatedEmoji emoji={emoji} size={14} play={play} />
             {user_ids.length > 1 && (
               <Text style={[styles.reactionPillCount, { color: colors.foreground }]}>
                 {user_ids.length}
@@ -275,6 +283,8 @@ function RichContent({
   colors,
   collapsed,
   onTruncatedChange,
+  messageId,
+  visibility,
 }: {
   content: string;
   mentions: Message['mentions'];
@@ -283,10 +293,13 @@ function RichContent({
   collapsed: boolean;
   /** Reports whether the collapsed text hides content (drives bubble taps). */
   onTruncatedChange: (truncated: boolean) => void;
+  messageId: string;
+  visibility?: MessageVisibilityStore;
 }) {
   const [phase, setPhase] = useState<TruncationPhase>({ kind: 'measuring-full' });
   const runs = useMemo(() => splitContentForRender(content, mentions), [content, mentions]);
   const plain = useMemo(() => runs.map((run) => run.text).join(''), [runs]);
+  const visible = useMessageVisibility(visibility, messageId);
 
   // New content starts a fresh measurement; an expanded message never
   // measures. Resetting during render (not in an effect) keeps a layout event
@@ -332,8 +345,33 @@ function RichContent({
           </Text>
         );
       }
-      return <Fragment key={i}>{text}</Fragment>;
+      return <Fragment key={i}>{renderEmojiText(text, i)}</Fragment>;
     });
+  }
+
+  /**
+   * Collapsed bodies that actually truncate stay text-only: inline views
+   * below the line clamp could spill outside the bubble. Fitting or expanded
+   * bodies animate their emoji like the web message text.
+   */
+  const animateEmoji = !collapsed || (phase.kind === 'ready' && phase.cut === null);
+
+  function renderEmojiText(text: string, key: number) {
+    if (!animateEmoji) return text;
+    const pieces = splitTextEmojiRuns(text);
+    if (pieces.length === 1 && pieces[0].kind === 'text') return text;
+    return pieces.map((piece, index) =>
+      piece.kind === 'emoji' ? (
+        <AnimatedEmoji
+          key={`${key}-${index}`}
+          emoji={piece.text}
+          size={20}
+          play={visible}
+        />
+      ) : (
+        <Fragment key={`${key}-${index}`}>{piece.text}</Fragment>
+      ),
+    );
   }
 
   /**
@@ -670,8 +708,10 @@ export const MessageBubble = memo(function MessageBubble({
   highlighted = false,
   actionsOpen = false,
   variant = 'community',
+  visibility,
 }: Props) {
   const colors = useColors();
+  const visible = useMessageVisibility(visibility, message.id);
   const { user: signedInUser } = useAuth();
   const { width: screenWidth } = useWindowDimensions();
 
@@ -943,7 +983,18 @@ export const MessageBubble = memo(function MessageBubble({
                     onLongPress={handleLongPress}
                   />
                 )}
-                <Text style={styles.bigEmoji}>{message.content}</Text>
+                <View style={styles.bigEmojiRow}>
+                  {splitTextEmojiRuns(message.content ?? '')
+                    .filter((run) => run.kind === 'emoji')
+                    .map((run, index) => (
+                      <AnimatedEmoji
+                        key={index}
+                        emoji={run.text}
+                        size={EMOJI_MESSAGE_SIZE}
+                        play={visible}
+                      />
+                    ))}
+                </View>
                 {!leftRail && <TimeRow message={message} isOwn={isOwn} colors={colors} />}
               </View>
               <ReactionPills
@@ -952,6 +1003,7 @@ export const MessageBubble = memo(function MessageBubble({
                 messageId={message.id}
                 onReactionPress={onReactionPress}
                 colors={colors}
+                play={visible}
               />
             </View>
           </View>
@@ -1084,6 +1136,8 @@ export const MessageBubble = memo(function MessageBubble({
                           colors={colors}
                           collapsed={!textExpanded}
                           onTruncatedChange={setTextTruncated}
+                          messageId={message.id}
+                          visibility={visibility}
                         />
                       </View>
                     )}
@@ -1120,6 +1174,7 @@ export const MessageBubble = memo(function MessageBubble({
                 messageId={message.id}
                 onReactionPress={onReactionPress}
                 colors={colors}
+                play={visible}
               />
             </View>
           </View>
@@ -1318,7 +1373,8 @@ const styles = StyleSheet.create({
 
   // ── big emoji ───────────────────────────────────────────────────────────
   emojiWrap: { alignItems: 'flex-start', paddingHorizontal: 2, paddingBottom: 2 },
-  bigEmoji: { fontSize: EMOJI_MESSAGE_SIZE, lineHeight: EMOJI_MESSAGE_SIZE + 8 },
+  // One row, never wrapped (web parity): 2–3 emoji stay big and side by side.
+  bigEmojiRow: { flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'center' },
 
   // ── reactions ───────────────────────────────────────────────────────────
   reactionPills: {
@@ -1338,7 +1394,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
   },
-  reactionPillEmoji: { fontSize: 14 },
   reactionPillCount: { fontSize: 10, fontFamily: 'Geist_500Medium', opacity: 0.7 },
   reactionSpacer: { height: 20 },
 });

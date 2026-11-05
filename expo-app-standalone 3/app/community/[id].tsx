@@ -2,11 +2,13 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useIsFocused } from '@react-navigation/native';
 import {
   ActivityIndicator,
+  AppState,
   FlatList,
   Image,
   Pressable,
   ScrollView,
   type ScrollViewProps,
+  type ViewToken,
   StyleSheet,
   Text,
   View,
@@ -20,6 +22,7 @@ import { useChatContentEvents } from '@/hooks/useChatContentEvents';
 import { useTypingPresence } from '@/hooks/useTypingPresence';
 import { useAuth } from '@/context/AuthContext';
 import { MessageBubble } from '@/components/chat/MessageBubble';
+import { createMessageVisibilityStore } from '@/lib/messageVisibility';
 import { ContentNotificationCard } from '@/components/chat/ContentNotificationCard';
 import { ContentActionsSheet } from '@/components/chat/ContentActionsSheet';
 import { ContentReportModal } from '@/components/community/ContentReportModal';
@@ -138,6 +141,30 @@ export default function CommunityChat() {
   const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  /** Rows currently on screen — animated emoji only fetch/play while visible. */
+  const visibilityStore = useRef(createMessageVisibilityStore()).current;
+  const visibleRowKeys = useRef(new Set<string>());
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      visibleRowKeys.current = new Set(
+        viewableItems.map((token) => String(token.key)),
+      );
+      visibilityStore.setVisible(visibleRowKeys.current);
+    },
+  ).current;
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 1 }).current;
+  useEffect(() => {
+    if (!isFocused) visibilityStore.setVisible(new Set());
+  }, [isFocused, visibilityStore]);
+  // Backgrounding the app must stop emoji too, not just scrolling them away.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      visibilityStore.setVisible(
+        state === 'active' && isFocused ? visibleRowKeys.current : new Set(),
+      );
+    });
+    return () => subscription.remove();
+  }, [isFocused, visibilityStore]);
   const [activeTab, setActiveTab] = useState<CommunityTab>('chat');
   const imeLayout = useChatImeLayout(activeTab === 'chat' && isFocused, {
     bottom: COMMUNITY_CHAT_COMPOSER_BOTTOM_INSET,
@@ -1190,11 +1217,13 @@ export default function CommunityChat() {
           onSwipeReply={handleMessageReply}
           highlighted={flashMessageId === item.msg.id}
           actionsOpen={selectedMessage?.id === item.msg.id}
+          visibility={visibilityStore}
         />
       );
     },
     [
       user?.id,
+      visibilityStore,
       handleLongPress,
       handleReaction,
       handleAuthorPress,
@@ -1316,6 +1345,8 @@ export default function CommunityChat() {
           }
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.2}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
           onScrollToIndexFailed={(info) => {
             // Variable-height bubbles make an exact index jump unreliable; land
             // near the row, let layout settle, then retry once.

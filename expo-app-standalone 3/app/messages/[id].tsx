@@ -15,6 +15,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useIsFocused } from '@react-navigation/native';
 import {
   ActivityIndicator,
+  AppState,
   FlatList,
   Modal,
   Pressable,
@@ -22,6 +23,7 @@ import {
   Text,
   View,
   type ScrollViewProps,
+  type ViewToken,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -32,6 +34,7 @@ import { EditMessageModal } from '@/components/chat/EditMessageModal';
 import { ImageViewer, type LightboxImage } from '@/components/chat/ImageViewer';
 import { MessageActionsSheet } from '@/components/chat/MessageActionsSheet';
 import { MessageBubble } from '@/components/chat/MessageBubble';
+import { createMessageVisibilityStore } from '@/lib/messageVisibility';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { DmComposer } from '@/components/dm/DmComposer';
 import { EmojiPicker } from '@/components/chat/EmojiPicker';
@@ -177,6 +180,30 @@ export default function DmThreadScreen() {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const imeLayout = useChatImeLayout(isFocused, { nativeListInsets: true });
+  /** Rows currently on screen — animated emoji only fetch/play while visible. */
+  const visibilityStore = useRef(createMessageVisibilityStore()).current;
+  const visibleRowKeys = useRef(new Set<string>());
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      visibleRowKeys.current = new Set(
+        viewableItems.map((token) => String(token.key)),
+      );
+      visibilityStore.setVisible(visibleRowKeys.current);
+    },
+  ).current;
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 1 }).current;
+  useEffect(() => {
+    if (!isFocused) visibilityStore.setVisible(new Set());
+  }, [isFocused, visibilityStore]);
+  // Backgrounding the app must stop emoji too, not just scrolling them away.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      visibilityStore.setVisible(
+        state === 'active' && isFocused ? visibleRowKeys.current : new Set(),
+      );
+    });
+    return () => subscription.remove();
+  }, [isFocused, visibilityStore]);
   const { listInset, listTransition } = imeLayout;
   const renderChatScrollView = useCallback((props: ScrollViewProps) => (
     <ChatScrollView {...props} bottomInset={listInset} transition={listTransition} followThreshold={24} />
@@ -1296,6 +1323,7 @@ export default function DmThreadScreen() {
         highlighted={flashMessageId === item.msg.id}
         actionsOpen={selectedMessage?.id === item.msg.id}
         variant="dm"
+        visibility={visibilityStore}
       />
     );
   }, [
@@ -1310,6 +1338,7 @@ export default function DmThreadScreen() {
     openPeerProfile,
     selectedMessage?.id,
     userId,
+    visibilityStore,
   ]);
 
   return (
@@ -1413,6 +1442,8 @@ export default function DmThreadScreen() {
                 onScrollBeginDrag={imeLayout.closePanel}
                 onEndReached={() => void loadMore()}
                 onEndReachedThreshold={0.3}
+                onViewableItemsChanged={onViewableItemsChanged}
+                viewabilityConfig={viewabilityConfig}
                 onScrollToIndexFailed={(info) => {
                   listRef.current?.scrollToOffset({
                     offset: Math.max(0, info.averageItemLength * info.index),
