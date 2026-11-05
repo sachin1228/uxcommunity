@@ -1566,15 +1566,7 @@ export default function DmThreadScreen() {
             pointerEvents="box-none"
             style={[styles.dmDock, imeLayout.dockStyle]}
           >
-          <View
-            style={[
-              styles.footer,
-              {
-                borderTopColor: colors.border,
-                backgroundColor: colors.background,
-              },
-            ]}
-          >
+          <View style={[styles.footer, { backgroundColor: colors.background }]}>
             <View onLayout={imeLayout.onTypingIndicatorLayout}>
               <TypingIndicator users={typingUsers} />
             </View>
@@ -1967,7 +1959,6 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   footer: {
-    borderTopWidth: StyleSheet.hairlineWidth,
     overflow: 'visible',
   },
   footerBar: {
