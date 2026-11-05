@@ -16,6 +16,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/AppHeader';
 import { CommunityRow } from '@/components/communities/CommunityRow';
+import { PhotoViewerModal } from '@/components/PhotoViewerModal';
 import {
   NotificationPermissionBanner,
   NotificationPermissionSheet,
@@ -55,6 +56,8 @@ export default function CommunitiesScreen() {
     catchUpList,
   } = useCommunities();
   const [query, setQuery] = useState('');
+  /** The row whose face is open full screen — set only for rows with a picture. */
+  const [photoCommunity, setPhotoCommunity] = useState<Community | null>(null);
   const notificationPermission = useNotificationPermission();
   const [notificationPromptOpen, setNotificationPromptOpen] = useState(false);
   const [notificationNoticeDismissed, setNotificationNoticeDismissed] = useState(false);
@@ -170,6 +173,7 @@ export default function CommunitiesScreen() {
         nowMs={nowMs}
         onPress={() => handleCommunityPress(item)}
         onPressIn={() => prefetchCommunityMessages(user?.id, item.id)}
+        onPressAvatar={() => setPhotoCommunity(item)}
       />
     ),
     [getTypingLabel, handleCommunityPress, nowMs, user?.id]
@@ -297,6 +301,13 @@ export default function CommunitiesScreen() {
       <NotificationPermissionSheet
         visible={notificationPromptOpen}
         onClose={() => setNotificationPromptOpen(false)}
+      />
+
+      <PhotoViewerModal
+        visible={photoCommunity !== null}
+        uri={photoCommunity?.image_url ?? null}
+        title="Community photo"
+        onClose={() => setPhotoCommunity(null)}
       />
     </View>
   );
