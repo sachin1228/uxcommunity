@@ -1,5 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Animated,
+  Easing,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { useColors } from '@/hooks/useColors';
@@ -210,13 +218,32 @@ export function CommunityRow({
   const isMuted = isCommunityMuted(community, nowMs);
   const badges = communityNameBadges(community.type, community.is_private);
 
+  // The selection check takes the verified seal's corner. It springs in so the
+  // swap reads as a state change rather than a flicker; the seal returns when
+  // the row leaves selection.
+  const selectionAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!selected) {
+      selectionAnim.setValue(0);
+      return undefined;
+    }
+    const animation = Animated.timing(selectionAnim, {
+      toValue: 1,
+      duration: 160,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [selected, selectionAnim]);
+
   // An event's group chat wears its event date as a calendar tile over the
   // same face everywhere (web parity), and a platform group's verified seal
   // rides the face itself.
   const avatar = (
     <DpWithEventDate
-      date={community.event_date}
-      endsAt={community.event_end ?? community.pinned_until}
+      date={selected ? null : community.event_date}
+      endsAt={selected ? null : community.event_end ?? community.pinned_until}
       dpSize={48}
     >
       {community.image_url ? (
@@ -230,7 +257,7 @@ export function CommunityRow({
       ) : (
         <CommunityIcon size={48} />
       )}
-      {badges.verified && <VerifiedDpBadge dpSize={48} />}
+      {badges.verified && !selected && <VerifiedDpBadge dpSize={48} />}
     </DpWithEventDate>
   );
 
@@ -278,15 +305,32 @@ export function CommunityRow({
       >
         {avatar}
         {selected && (
-          <View
+          <Animated.View
             pointerEvents="none"
             style={[
               styles.selectedBadge,
-              { backgroundColor: colors.accent, borderColor: colors.background },
+              {
+                backgroundColor: colors.accent,
+                borderColor: colors.background,
+                opacity: selectionAnim,
+                transform: [
+                  {
+                    scale: selectionAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.7, 1],
+                    }),
+                  },
+                ],
+              },
             ]}
           >
-            <Feather name="check" size={11} strokeWidth={3} color={colors.accentForeground} />
-          </View>
+            <Feather
+              name="check"
+              size={12}
+              strokeWidth={3}
+              color={colors.accentForeground}
+            />
+          </Animated.View>
         )}
       </Pressable>
 
@@ -428,15 +472,15 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   avatarPressed: { opacity: 0.85 },
-  // Selection mark rides the face's upper-right edge: the lower-right corner
-  // already belongs to the verified seal and the event calendar tile.
+  // The selection check sits exactly where the verified seal sits, so
+  // selecting swaps the blue tick for the check and deselecting swaps it back.
   selectedBadge: {
     position: 'absolute',
-    top: -3,
-    right: -3,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    right: -2,
+    bottom: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',

@@ -444,49 +444,44 @@ export default function CommunitiesScreen() {
       )}
 
       {/* Search filters the joined list locally. Creating lives in the
-          floating + at the bottom-right, above the tab bar. Selection takes
-          the whole chrome over, like WhatsApp. */}
-      {!selectionActive && (
-        <View style={styles.searchRow}>
-          <View
-            style={[
-              styles.searchField,
-              { backgroundColor: colors.card, borderColor: colors.border },
-            ]}
-          >
-            <Feather name="search" size={15} color={colors.mutedForeground} />
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Search communities…"
-              placeholderTextColor={colors.mutedForeground}
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType="search"
-              accessibilityLabel="Search communities"
-              style={[styles.searchInput, { color: colors.foreground }]}
-            />
-            {query.length > 0 && (
-              <Pressable
-                onPress={() => setQuery('')}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="Clear search"
-              >
-                <Feather name="x" size={14} color={colors.mutedForeground} />
-              </Pressable>
-            )}
-          </View>
-        </View>
-      )}
-
-      {!selectionActive &&
-        notificationPermission === 'denied' &&
-        !notificationNoticeDismissed && (
-          <NotificationPermissionBanner
-            onDismiss={() => setNotificationNoticeDismissed(true)}
+          floating + at the bottom-right, above the tab bar. */}
+      <View style={styles.searchRow}>
+        <View
+          style={[
+            styles.searchField,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
+          <Feather name="search" size={15} color={colors.mutedForeground} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search communities…"
+            placeholderTextColor={colors.mutedForeground}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            accessibilityLabel="Search communities"
+            style={[styles.searchInput, { color: colors.foreground }]}
           />
-        )}
+          {query.length > 0 && (
+            <Pressable
+              onPress={() => setQuery('')}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+            >
+              <Feather name="x" size={14} color={colors.mutedForeground} />
+            </Pressable>
+          )}
+        </View>
+      </View>
+
+      {notificationPermission === 'denied' && !notificationNoticeDismissed && (
+        <NotificationPermissionBanner
+          onDismiss={() => setNotificationNoticeDismissed(true)}
+        />
+      )}
 
       {isLoading && (
         <View style={styles.center}>
@@ -544,25 +539,23 @@ export default function CommunitiesScreen() {
 
       {/* Fixed floating create — same round control the search row used to
           hold, now hovering above the tab bar while the list scrolls. */}
-      {!selectionActive && (
-        <Pressable
-          onPress={() => router.push('/create-community')}
-          hitSlop={6}
-          accessibilityRole="button"
-          accessibilityLabel="Create community"
-          style={({ pressed }) => [
-            styles.fab,
-            {
-              backgroundColor: pressed ? colors.accentHover : colors.accent,
-              borderColor: colors.accent,
-              bottom: insets.bottom + 96,
-              shadowColor: '#000000',
-            },
-          ]}
-        >
-          <Feather name="plus" size={22} color={colors.accentForeground} />
-        </Pressable>
-      )}
+      <Pressable
+        onPress={() => router.push('/create-community')}
+        hitSlop={6}
+        accessibilityRole="button"
+        accessibilityLabel="Create community"
+        style={({ pressed }) => [
+          styles.fab,
+          {
+            backgroundColor: pressed ? colors.accentHover : colors.accent,
+            borderColor: colors.accent,
+            bottom: insets.bottom + 96,
+            shadowColor: '#000000',
+          },
+        ]}
+      >
+        <Feather name="plus" size={22} color={colors.accentForeground} />
+      </Pressable>
 
       {toast && (
         <View
