@@ -388,7 +388,6 @@ function ConversationRow({
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
-        { borderBottomColor: colors.border },
         pressed && { backgroundColor: colors.surfaceRaised },
       ]}
     >
@@ -487,7 +486,6 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 16,
     paddingVertical: 13,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   rowBody: { flex: 1, minWidth: 0, gap: 3 },
   rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
