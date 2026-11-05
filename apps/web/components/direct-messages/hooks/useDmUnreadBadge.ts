@@ -28,6 +28,12 @@ const STALE_MS = 30_000;
 export function useDmUnreadBadge(userId: string) {
   initRequestCache(userId);
   const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * Only the newest badge read may paint. A response that was already in
+   * flight when a conversation was read can land after the refetch it
+   * triggered; applying it would restore the badge the member just cleared.
+   */
+  const fetchSeqRef = useRef(0);
 
   const [count, setCount] = useState(
     () => getCachedRequest<{ count: number }>(dmUrls.unread, userId)?.count ?? 0,
@@ -36,19 +42,29 @@ export function useDmUnreadBadge(userId: string) {
   const readCount = useCallback(() => {
     const next = getCachedRequest<{ count: number }>(dmUrls.unread, userId);
     if (next) {
+      // A patched cache entry is authoritative; supersede any older read that
+      // is still in flight so its late answer cannot repaint the count.
+      fetchSeqRef.current += 1;
       setCount(next.count);
       return true;
     }
     return false;
   }, [userId]);
 
+  const load = useCallback(
+    (force: boolean) => {
+      const seq = ++fetchSeqRef.current;
+      void fetchJsonCached<{ count: number }>(dmUrls.unread, { staleMs: STALE_MS, force }, userId)
+        .then((data) => {
+          if (seq === fetchSeqRef.current) setCount(data.count ?? 0);
+        })
+        .catch(() => {});
+    },
+    [userId],
+  );
+
   // Fetch on mount (cache-first) and on any cache notification.
   useEffect(() => {
-    const load = (force: boolean) => {
-      void fetchJsonCached<{ count: number }>(dmUrls.unread, { staleMs: STALE_MS, force }, userId)
-        .then((data) => setCount(data.count ?? 0))
-        .catch(() => {});
-    };
     load(false);
     return subscribeToRequest(
       dmUrls.unread,
@@ -59,12 +75,10 @@ export function useDmUnreadBadge(userId: string) {
       },
       userId,
     );
-  }, [userId, readCount]);
+  }, [userId, readCount, load]);
 
   useHiddenCatchUp(() => {
-    void fetchJsonCached<{ count: number }>(dmUrls.unread, { staleMs: STALE_MS, force: true }, userId)
-      .then((data) => setCount(data.count ?? 0))
-      .catch(() => {});
+    load(true);
   });
 
   // Realtime: a peer message changes the count only when its conversation
@@ -113,9 +127,7 @@ export function useDmUnreadBadge(userId: string) {
       if (refetchTimerRef.current) clearTimeout(refetchTimerRef.current);
       refetchTimerRef.current = setTimeout(() => {
         refetchTimerRef.current = null;
-        void fetchJsonCached<{ count: number }>(dmUrls.unread, { staleMs: STALE_MS, force: true }, userId)
-          .then((data) => setCount(data.count ?? 0))
-          .catch(() => {});
+        load(true);
       }, 600);
     });
 
@@ -124,7 +136,7 @@ export function useDmUnreadBadge(userId: string) {
       unsub();
       unsubRoom();
     };
-  }, [userId]);
+  }, [userId, load]);
 
   return count;
 }

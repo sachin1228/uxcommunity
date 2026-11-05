@@ -95,3 +95,26 @@ test('cancel drops the pending trailing read', () => {
   h.advance(10_000);
   assert.deepEqual(h.sent, ['m1']);
 });
+
+test('flush sends the pending trailing read immediately', () => {
+  const h = harness();
+  h.coalescer.request('m1');
+  h.coalescer.request('m2');
+  h.coalescer.flush();
+  assert.deepEqual(h.sent, ['m1', 'm2']);
+  h.advance(10_000);
+  assert.deepEqual(h.sent, ['m1', 'm2']);
+});
+
+test('a forced request retries a position that was already sent', () => {
+  const h = harness();
+  h.coalescer.request('m1');
+  h.coalescer.request('m2');
+  h.advance(2_000);
+  assert.deepEqual(h.sent, ['m1', 'm2']);
+
+  // m2's PATCH may have failed after it was recorded as sent; a foreground
+  // retry must be allowed to try again.
+  h.coalescer.request('m2', true);
+  assert.deepEqual(h.sent, ['m1', 'm2', 'm2']);
+});

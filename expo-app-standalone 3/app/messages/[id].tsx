@@ -470,18 +470,23 @@ export default function DmThreadScreen() {
     setLoading(true);
     setError(null);
     try {
+      // Opening from the list already has the conversation row in the shared
+      // cache. Re-reading the whole conversation list here put that (heavy)
+      // projection in front of the messages; a deep link or a cold cache still
+      // asks the server for it.
+      const known = peekDmConversation(targetId);
       const [page, conversations] = await Promise.all([
         getDmMessages(targetId),
-        // Metadata the list screen already fetched is reused for a short
-        // window; a cold deep link still asks the server. A failed refresh
-        // must not blank a thread whose last copy is already on screen.
-        loadDmConversations().catch(() => [] as DmConversation[]),
+        known
+          ? Promise.resolve<DmConversation[] | null>(null)
+          : loadDmConversations().catch(() => [] as DmConversation[]),
       ]);
       // The route or the account changed while the page was in flight.
       if (conversationIdRef.current !== targetId) return;
       if (currentUserIdRef.current !== ownerId) return;
       const found =
-        conversations.find((row) => row.id === targetId) ??
+        conversations?.find((row) => row.id === targetId) ??
+        known ??
         peekDmConversation(targetId) ??
         synthesizeConversation();
       dataUserIdRef.current = ownerId;
@@ -497,7 +502,7 @@ export default function DmThreadScreen() {
       setHasMore(page.hasMore);
       setConversation(found);
       lastLoadedAtRef.current = Date.now();
-      if (found && conversations.some((row) => row.id === targetId)) {
+      if (found && conversations?.some((row) => row.id === targetId)) {
         putDmConversation(found);
       }
 
@@ -618,22 +623,25 @@ export default function DmThreadScreen() {
   // ── Read marking: newest real (non-temp) message, coalesced ──────────────
   // One trailing PATCH carries the newest id seen, so a cache paint + page
   // merge + send in one open cannot mark an already-stale message three times.
+  const readFailedRef = useRef(false);
   const readCoalescer = useMemo(
     () =>
       createDmReadCoalescer({
         throttleMs: MARK_READ_THROTTLE_MS,
         send: (messageId) => {
           void markDmRead(conversationId, messageId)
-            .then(() => signalDmListChanged())
+            .then(() => {
+              readFailedRef.current = false;
+              signalDmListChanged();
+            })
             .catch(() => {
-              /* the next message or open retries */
+              // Retried on the next message, foreground, or open.
+              readFailedRef.current = true;
             });
         },
       }),
     [conversationId, userId],
   );
-
-  useEffect(() => () => readCoalescer.cancel(), [readCoalescer, userId]);
 
   const markReadNow = useCallback(
     (force = false) => {
@@ -647,9 +655,36 @@ export default function DmThreadScreen() {
     [conversationId, messages, readCoalescer],
   );
 
+  // A ref keeps the app-state listener from re-subscribing on every message.
+  const markReadNowRef = useRef(markReadNow);
+  useEffect(() => {
+    markReadNowRef.current = markReadNow;
+  }, [markReadNow]);
+  const isFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    isFocusedRef.current = isFocused;
+  }, [isFocused]);
+
   useEffect(() => {
     markReadNow();
   }, [markReadNow]);
+
+  // Leaving the thread must not drop a read queued inside the throttle window;
+  // backgrounding is the same, because the OS may suspend the timer. Coming
+  // back to the foreground retries a marker whose PATCH failed while away.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        if (isFocusedRef.current) markReadNowRef.current(readFailedRef.current);
+      } else {
+        readCoalescer.flush();
+      }
+    });
+    return () => {
+      subscription.remove();
+      readCoalescer.flush();
+    };
+  }, [readCoalescer, userId]);
 
   // ── Catch-up after a reconnect (missed events are recovered via ?after=) ──
   const catchUp = useCallback(async () => {

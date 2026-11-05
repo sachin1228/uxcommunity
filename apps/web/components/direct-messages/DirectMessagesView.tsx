@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ImageLightbox, type LightboxImage } from "@/components/communities/chat/ImageLightbox";
 import { DmIcon } from "@/components/ui/DmIcon";
 import { MAX_MESSAGE_CHARS } from "@/components/communities/chat/chatUtils";
+import { useDocumentVisible } from "@/lib/use-document-visible";
 import { invalidateRequest, patchCachedRequest } from "@/lib/request-cache";
 import { bumpConversationWithMessage } from "@/lib/direct-messages/client-cache";
 import { dmUrls } from "@/lib/direct-messages/client";
@@ -105,6 +106,12 @@ export function DirectMessagesView({
   useEffect(() => {
     activeIdRef.current = activeId;
   }, [activeId]);
+
+  /** Newest displayed position already reported read in this open. */
+  const markedThroughRef = useRef<{ conversationId: string | null; through: number }>({
+    conversationId: null,
+    through: 0,
+  });
 
   // The ?peer= handoff has been flushed into state (initialConversation);
   // strip it from the URL so a refresh lands on the plain window and a later
@@ -439,12 +446,17 @@ export function DirectMessagesView({
   // request. Re-arms whenever that newest timestamp advances, so a first mark
   // made from a partly-loaded page can never wedge the marker; the read
   // manager debounces and cools down the follow-up requests.
-  const markedThroughRef = useRef<{ conversationId: string | null; through: number }>({
-    conversationId: null,
-    through: 0,
-  });
+  //
+  // A cache paint is on screen too: waiting for `initialReady` (the catch-up
+  // fetch) meant opening a cached thread and leaving before the network
+  // answered never marked it at all, and the unread badge came straight back.
+  // The rows must belong to THIS conversation — a switch still holds the
+  // previous thread's rows for one render — and the tab must be visible,
+  // because a hidden tab is not reading anything.
+  const isDocumentVisible = useDocumentVisible();
   useEffect(() => {
-    if (!activeId || !thread.initialReady) return;
+    if (!activeId || !isDocumentVisible) return;
+    if (thread.displayedConversationId !== activeId) return;
     const newest = newestRealMessage(thread.messages);
     if (!newest) return;
     const through = new Date(newest.created_at).getTime();
@@ -456,7 +468,7 @@ export function DirectMessagesView({
       immediate: isFirstMarkThisOpen,
       lastReadAt: newest.created_at,
     });
-  }, [activeId, thread.initialReady, thread.messages]);
+  }, [activeId, isDocumentVisible, thread.displayedConversationId, thread.messages]);
 
   useEffect(() => {
     return onConversationRead((conversationId, markedAt) => {
@@ -498,6 +510,10 @@ export function DirectMessagesView({
 
   // ── Opening a conversation ────────────────────────────────────────────────
   const openConversation = useCallback((conversationId: string) => {
+    // A new open starts a fresh marking session. Without this, reopening the
+    // same conversation returned early on the previous session's watermark, so
+    // a read PATCH that failed (or was cut off) was never retried.
+    markedThroughRef.current = { conversationId: null, through: 0 };
     setActiveId(conversationId);
     setActionError(null);
     // Seed the fallback copy with what the list knows: once a refetch drops

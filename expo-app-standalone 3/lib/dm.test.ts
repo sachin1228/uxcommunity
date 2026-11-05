@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  bumpConversationWithMessage,
   dmComposerState,
   dmConversationPreview,
   dmTimestampLabel,
@@ -259,4 +260,55 @@ test('newestMessageAt finds the latest message regardless of order', () => {
     '2026-01-03T00:00:00.000Z',
   );
   assert.equal(newestMessageAt([]), null);
+});
+
+// ---------------------------------------------------------------------------
+// Live list bump
+// ---------------------------------------------------------------------------
+
+test('an incoming message moves its row to the top and bumps unread', () => {
+  const rows = [conversation({ id: 'c1' }), conversation({ id: 'c2' })];
+  const next = bumpConversationWithMessage(rows, VIEWER, {
+    id: 'm1',
+    conversation_id: 'c2',
+    user_id: PEER,
+    content: 'hello',
+    image_url: null,
+    created_at: '2026-01-02T00:00:00.000Z',
+  });
+
+  assert.deepEqual(next.map((row) => row.id), ['c2', 'c1']);
+  assert.equal(next[0].unread_count, 1);
+  assert.equal(next[0].last_message?.content, 'hello');
+  assert.equal(next[0].last_message_at, '2026-01-02T00:00:00.000Z');
+});
+
+test('an own message refreshes the preview without counting unread', () => {
+  const [row] = bumpConversationWithMessage(
+    [conversation({ unread_count: 2 })],
+    VIEWER,
+    {
+      id: 'm1',
+      conversation_id: 'c1',
+      user_id: VIEWER,
+      content: 'mine',
+      created_at: '2026-01-02T00:00:00.000Z',
+    },
+  );
+  assert.equal(row.unread_count, 2);
+  assert.equal(row.last_message?.content, 'mine');
+});
+
+test('a message for an unknown conversation leaves the list untouched', () => {
+  const rows = [conversation({ id: 'c1' })];
+  assert.equal(
+    bumpConversationWithMessage(rows, VIEWER, {
+      id: 'm1',
+      conversation_id: 'c-unknown',
+      user_id: PEER,
+      content: 'hello',
+      created_at: '2026-01-02T00:00:00.000Z',
+    }),
+    rows,
+  );
 });

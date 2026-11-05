@@ -202,6 +202,49 @@ export function unreadPillLabel(count: number): string {
   return count > 99 ? '99+' : String(count);
 }
 
+/** The fields of a `dm-message` realtime event the list row previews. */
+export interface DmRealtimeListMessage {
+  id: string;
+  conversation_id: string;
+  user_id: string;
+  content?: string | null;
+  image_url?: string | null;
+  created_at: string;
+}
+
+/**
+ * Fold a live message into the list immediately — the row must not wait for
+ * the debounced refetch to show what the push already announced. Returns the
+ * same array for a conversation the list has not seen yet (the caller then
+ * refreshes, because only the server knows the peer's identity).
+ */
+export function bumpConversationWithMessage(
+  conversations: DmConversation[],
+  viewerId: string,
+  message: DmRealtimeListMessage,
+): DmConversation[] {
+  const current = conversations.find((row) => row.id === message.conversation_id);
+  if (!current) return conversations;
+  const isOwn = message.user_id === viewerId;
+  const bumped: DmConversation = {
+    ...current,
+    last_message: {
+      id: message.id,
+      content: message.content?.trim() ? message.content : null,
+      image_url: message.image_url ?? null,
+      created_at: message.created_at,
+      user_id: message.user_id,
+      deleted_at: null,
+      edited_at: null,
+    },
+    last_message_at: message.created_at,
+    // A message is newer activity than any reaction.
+    last_reaction: null,
+    unread_count: isOwn ? current.unread_count : current.unread_count + 1,
+  };
+  return [bumped, ...conversations.filter((row) => row.id !== current.id)];
+}
+
 /** "2h" / "3d" / "12 Oct" — the list row's stamp (web timeAgo-style buckets). */
 export function dmTimestampLabel(iso: string | null, now: number = Date.now()): string {
   if (!iso) return '';

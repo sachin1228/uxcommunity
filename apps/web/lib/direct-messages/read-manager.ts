@@ -88,6 +88,8 @@ async function sendRead(conversationId: string, attempt = 0): Promise<void> {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ last_read_at: lastReadAt }),
+      // A mark queued just before the member closes the tab must still land.
+      keepalive: true,
     });
     if (!res.ok) throw new Error(`read failed: ${res.status}`);
     const data = (await res.json().catch(() => null)) as { markedAt?: string } | null;
@@ -152,4 +154,24 @@ export function markConversationRead(
     void sendRead(conversationId);
   }, options.immediate ? 0 : DEBOUNCE_MS);
   pendingTimers.set(conversationId, timer);
+}
+
+/**
+ * Send every queued read now. The debounce/cooldown exists to collapse bursts
+ * on a live tab; a tab that is closing will never reach its timer, so `pagehide`
+ * drains the queue instead of losing the member's position.
+ */
+export function flushPendingReads(): void {
+  for (const conversationId of pendingLastReadAt.keys()) {
+    const timer = pendingTimers.get(conversationId);
+    if (timer) {
+      clearTimeout(timer);
+      pendingTimers.delete(conversationId);
+    }
+    void sendRead(conversationId);
+  }
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("pagehide", flushPendingReads);
 }

@@ -277,11 +277,6 @@ export async function loadDmMessagePage(
 ): Promise<ReadResult<{ messages: unknown[] }>> {
   const db = createServiceClient();
 
-  const access = await loadDmConversationForUser(db, conversationId, userId);
-  if (!access.ok) {
-    return { ok: false, status: access.status, error: access.error };
-  }
-
   // Cursors are compound (created_at, id): the timestamp alone cannot order
   // same-millisecond messages, and paging on it could skip one. A malformed
   // half is rejected rather than silently degraded.
@@ -298,15 +293,28 @@ export async function loadDmMessagePage(
     return { ok: false, status: 400, error: "Invalid cursor." };
   }
 
-  const { data, error } = await callPerformanceRpc(db, "get_dm_message_page", {
-    p_conversation_id: conversationId,
-    p_user_id: userId,
-    p_before: after ? null : before,
-    p_before_id: after ? null : beforeId,
-    p_after: after,
-    p_after_id: afterId,
-    p_limit: DM_MESSAGE_PAGE_SIZE,
-  });
+  // The page RPC is already participant-gated (its `participant` CTE returns
+  // nothing for an outsider), so the access read only decides 403/404 vs 200.
+  // Running the two in parallel removes one sequential database round trip
+  // from every thread open; an outsider's page query returns no rows and is
+  // discarded.
+  const [access, page] = await Promise.all([
+    loadDmConversationForUser(db, conversationId, userId),
+    callPerformanceRpc(db, "get_dm_message_page", {
+      p_conversation_id: conversationId,
+      p_user_id: userId,
+      p_before: after ? null : before,
+      p_before_id: after ? null : beforeId,
+      p_after: after,
+      p_after_id: afterId,
+      p_limit: DM_MESSAGE_PAGE_SIZE,
+    }),
+  ]);
+  if (!access.ok) {
+    return { ok: false, status: access.status, error: access.error };
+  }
+
+  const { data, error } = page;
   if (error) return { ok: false, status: 500, error: "Failed to fetch messages." };
 
   // SQL returns newest-first (so the limit keeps the newest rows); the

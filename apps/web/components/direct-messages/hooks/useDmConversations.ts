@@ -77,9 +77,14 @@ export function useDmConversations({ userId }: { userId: string }) {
   // effect body, so priming never cascades a second render. A response that
   // arrives after the effect was torn down still lands in the module cache —
   // it is the paint, not the snapshot, that has to be dropped.
+  //
+  // The mount read is forced: a message can arrive while the member is on any
+  // other dashboard page (the badge hears it, this list does not), and reusing
+  // a request-cache entry up to 30 s old made the new conversation show up
+  // only after the realtime catch-up re-fetched the list.
   useEffect(() => {
     let cancelled = false;
-    void loadConversations(userId, false)
+    void loadConversations(userId, true)
       .then((next) => {
         dmCache.setConversations(next);
         if (!cancelled) setConversationsState(next);

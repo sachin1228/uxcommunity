@@ -9,6 +9,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   FlatList,
   Pressable,
   RefreshControl,
@@ -34,11 +35,13 @@ import {
 } from '@/lib/dmConversationsCache';
 import { chatCache } from '@/lib/chatCacheStore';
 import {
+  bumpConversationWithMessage,
   dmConversationPreview,
   dmTimestampLabel,
   isIncomingRequest,
   unreadPillLabel,
   type DmConversation,
+  type DmRealtimeListMessage,
 } from '@/lib/dm';
 
 const REALTIME_DEBOUNCE_MS = 600;
@@ -63,6 +66,8 @@ export default function MessagesScreen() {
   const focusedOnceRef = useRef(false);
   const userIdRef = useRef(userId);
   const loadedForUserRef = useRef<string | null>(null);
+  /** Init to now: the mount's own socket connect is not a gap to recover. */
+  const lastLoadedAtRef = useRef(Date.now());
 
   const load = useCallback(async (mode: 'initial' | 'refresh' | 'silent' = 'initial') => {
     if (!userId) return;
@@ -73,6 +78,7 @@ export default function MessagesScreen() {
       const rows = await loadDmConversations({ fresh: true });
       if (userIdRef.current !== userId) return;
       loadedForUserRef.current = userId;
+      lastLoadedAtRef.current = Date.now();
       setConversations(rows);
       if (mode !== 'silent') setError(null);
     } catch (e) {
@@ -182,7 +188,22 @@ export default function MessagesScreen() {
     };
 
     const unsubscribers = [
-      realtimeClient.on(room, 'dm-message', schedule),
+      // Paint the arriving message into its row at once — the debounced
+      // refetch then reconciles the authoritative unread counts behind it.
+      realtimeClient.on(room, 'dm-message', (data) => {
+        const payload = data as Partial<DmRealtimeListMessage> | null;
+        if (
+          userId &&
+          payload?.id &&
+          payload.conversation_id &&
+          payload.user_id &&
+          payload.created_at
+        ) {
+          const message = payload as DmRealtimeListMessage;
+          setConversations((prev) => bumpConversationWithMessage(prev, userId, message));
+        }
+        schedule();
+      }),
       realtimeClient.on(room, 'dm-request-update', schedule),
       realtimeClient.on(room, 'dm-message-edit', schedule),
       realtimeClient.on(room, 'dm-message-delete', schedule),
@@ -191,8 +212,21 @@ export default function MessagesScreen() {
       realtimeClient.on(room, 'dm-reaction-delete', schedule),
     ];
 
+    // A socket reconnect (or a return from the background) may have missed
+    // events the server does not replay; the page the member saw was stale
+    // until the next new message. Refresh as soon as the connection is back
+    // and whenever the app is foregrounded.
+    const unsubscribeStatus = realtimeClient.onRoomStatus(room, (connected) => {
+      if (connected && Date.now() - lastLoadedAtRef.current > 2_000) schedule();
+    });
+    const appStateSub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void load('silent');
+    });
+
     return () => {
       unsubscribers.forEach((unsubscribe) => unsubscribe());
+      unsubscribeStatus();
+      appStateSub.remove();
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
         debounceRef.current = null;

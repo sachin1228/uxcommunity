@@ -46,6 +46,8 @@ let sharedUserId: string | null = null;
 let sharedCount = 0;
 let fetchedAt = 0;
 let inFlight: Promise<void> | null = null;
+/** Only the newest read may publish — see refreshShared. */
+let fetchSeq = 0;
 const badgeListeners = new Set<() => void>();
 
 function countFor(userId: string | null): number {
@@ -64,19 +66,29 @@ function publish(userId: string, count: number): void {
 }
 
 function refreshShared(userId: string, force = false): Promise<void> {
-  if (inFlight) return inFlight;
-  if (!force && sharedUserId === userId && Date.now() - fetchedAt < FRESH_MS) {
-    return Promise.resolve();
+  if (!force) {
+    if (inFlight) return inFlight;
+    if (sharedUserId === userId && Date.now() - fetchedAt < FRESH_MS) {
+      return Promise.resolve();
+    }
   }
-  inFlight = getDmUnread()
-    .then((count) => publish(userId, count))
+  // A forced read is a "something just changed" signal (a conversation was
+  // read, the app returned). It must not be answered by a request that was
+  // already in flight before that change — that response can still carry the
+  // pre-read count and would leave the badge stuck with nothing to refresh it.
+  const seq = ++fetchSeq;
+  const request = getDmUnread()
+    .then((count) => {
+      if (seq === fetchSeq) publish(userId, count);
+    })
     .catch(() => {
       // Keep the previous count; the next event or foreground retries.
     })
     .finally(() => {
-      inFlight = null;
+      if (inFlight === request) inFlight = null;
     });
-  return inFlight;
+  inFlight = request;
+  return request;
 }
 
 export function useDmUnread(): number {
