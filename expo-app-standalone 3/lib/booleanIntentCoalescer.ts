@@ -7,6 +7,28 @@ export interface BooleanIntentCoalescerOptions {
 }
 
 /**
+ * Keep the overrides whose write is still on its way to the server.
+ *
+ * A list refetch or a realtime snapshot can land between the tap and the POST
+ * response. That snapshot predates the write, so dropping the optimistic state
+ * would flash the old heart and count until the response lands. Confirmed and
+ * rolled-back overrides are dropped as before — only an intent that has not
+ * settled survives the reset.
+ */
+export function retainPendingOverrides<T>(
+  overrides: Record<string, T>,
+  isPending: (key: string) => boolean,
+): Record<string, T> {
+  let dropped = false;
+  const next: Record<string, T> = {};
+  for (const [key, value] of Object.entries(overrides)) {
+    if (isPending(key)) next[key] = value;
+    else dropped = true;
+  }
+  return dropped ? next : overrides;
+}
+
+/**
  * Coalesces rapid boolean interactions into idempotent, explicit desired-state writes.
  * There is never more than one request in flight, and stale responses cannot replace
  * a newer local intent.
