@@ -32,9 +32,11 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EditMessageModal } from '@/components/chat/EditMessageModal';
 import { ImageViewer, type LightboxImage } from '@/components/chat/ImageViewer';
+import { PhotoViewerModal } from '@/components/PhotoViewerModal';
 import { MessageActionsSheet } from '@/components/chat/MessageActionsSheet';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { createMessageVisibilityStore } from '@/lib/messageVisibility';
+import { resolveProfilePictureUri } from '@/lib/profilePicture';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { DmComposer } from '@/components/dm/DmComposer';
 import { EmojiPicker } from '@/components/chat/EmojiPicker';
@@ -380,6 +382,7 @@ export default function DmThreadScreen() {
   const [answering, setAnswering] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1388,6 +1391,7 @@ export default function DmThreadScreen() {
   const unstarted = conversation ? isUnstartedRequest(conversation) : false;
   const displayPeerName = conversation?.peer.name ?? peerName;
   const displayPeerAvatar = conversation?.peer.avatar_url ?? (params.avatar || null);
+  const peerPhoto = resolveProfilePictureUri(displayPeerAvatar);
 
   const rejectedByMe =
     conversation?.request_state === 'rejected' && conversation.requested_by !== userId;
@@ -1482,20 +1486,35 @@ export default function DmThreadScreen() {
           <Ionicons name="arrow-back" size={22} color={colors.foreground} />
         </Pressable>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${displayPeerName} profile`}
-          onPress={openPeerProfile}
-          style={({ pressed }) => [
-            styles.headerPeer,
-            { opacity: pressed ? 0.75 : 1 },
-          ]}
-        >
-          <PersonAvatar name={displayPeerName} url={displayPeerAvatar} size={36} />
-          <Text style={[styles.headerTitle, { color: colors.foreground }]} numberOfLines={1}>
-            {displayPeerName}
-          </Text>
-        </Pressable>
+        {/* The face opens the photo full screen; the name opens the member's
+            profile, as the whole identity block used to. */}
+        <View style={styles.headerPeer}>
+          <Pressable
+            onPress={() => setPhotoOpen(true)}
+            disabled={!peerPhoto}
+            accessibilityRole={peerPhoto ? 'button' : undefined}
+            accessibilityLabel={peerPhoto ? `View ${displayPeerName} photo` : undefined}
+            hitSlop={4}
+            style={({ pressed }) =>
+              pressed && peerPhoto ? styles.headerAvatarPressed : null
+            }
+          >
+            <PersonAvatar name={displayPeerName} url={displayPeerAvatar} size={36} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${displayPeerName} profile`}
+            onPress={openPeerProfile}
+            style={({ pressed }) => [
+              styles.headerPeerName,
+              { opacity: pressed ? 0.75 : 1 },
+            ]}
+          >
+            <Text style={[styles.headerTitle, { color: colors.foreground }]} numberOfLines={1}>
+              {displayPeerName}
+            </Text>
+          </Pressable>
+        </View>
 
         <Pressable
           accessibilityRole="button"
@@ -1838,6 +1857,13 @@ export default function DmThreadScreen() {
         />
       ) : null}
 
+      <PhotoViewerModal
+        visible={photoOpen}
+        uri={peerPhoto}
+        title="Profile picture"
+        onClose={() => setPhotoOpen(false)}
+      />
+
       <ThreadOptionsSheet
         visible={menuOpen}
         blockedByMe={conversation?.blocked_by_me ?? false}
@@ -1983,6 +2009,8 @@ const styles = StyleSheet.create({
     minWidth: 0,
     paddingVertical: 2,
   },
+  headerPeerName: { flexShrink: 1, minWidth: 0 },
+  headerAvatarPressed: { opacity: 0.85 },
   headerTitle: {
     fontFamily: 'Geist_600SemiBold',
     fontSize: 16,

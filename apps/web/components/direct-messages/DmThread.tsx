@@ -3,7 +3,8 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { Ban, ChevronDown, ChevronLeft, Clock, Flag, Info, MoreVertical, ShieldOff, XCircle } from "lucide-react";
-import { AvatarImg } from "@/components/ui/AvatarImg";
+import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
+import { PhotoViewer } from "@/components/ui/PhotoViewer";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { MessageEditModal } from "@/components/communities/chat/MessageEditModal";
@@ -153,6 +154,9 @@ export function DmThread({
   // the recipient's view (they answer); `outgoingRequest` the sender's.
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const hasPhoto =
+    Boolean(peer.avatar_url) && !isGeneratedProfilePicture(peer.avatar_url);
   const blockedByMe = conversation.blocked_by_me;
   const requestState = conversation.request_state;
   const incomingRequest =
@@ -182,15 +186,27 @@ export function DmThread({
         >
           <ChevronLeft size={20} strokeWidth={2.5} />
         </button>
-        <Link
-          href={profileHref(peer.id)}
-          className="flex min-w-0 items-center gap-3 rounded-lg px-1 py-1 transition-colors hover:bg-surface-raised"
-        >
-          <AvatarImg url={peer.avatar_url} name={peer.name} size={36} className="shrink-0 rounded-full object-cover" />
-          <span className="min-w-0 truncate font-body text-sm font-semibold text-foreground">
-            {peer.name}
-          </span>
-        </Link>
+        <div className="relative flex min-w-0 items-center">
+          <Link
+            href={profileHref(peer.id)}
+            className="flex min-w-0 items-center gap-3 rounded-lg px-1 py-1 transition-colors hover:bg-surface-raised"
+          >
+            <AvatarImg url={peer.avatar_url} name={peer.name} size={36} className="shrink-0 rounded-full object-cover" />
+            <span className="min-w-0 truncate font-body text-sm font-semibold text-foreground">
+              {peer.name}
+            </span>
+          </Link>
+          {hasPhoto && (
+            /* The face opens the photo; the name still opens the profile. */
+            <button
+              type="button"
+              onClick={() => setPhotoOpen(true)}
+              className="absolute left-1 top-1/2 h-9 w-9 -translate-y-1/2 rounded-full transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              aria-label={`View ${peer.name}'s profile picture`}
+              title="View photo"
+            />
+          )}
+        </div>
 
         <button
           type="button"
@@ -441,6 +457,14 @@ export function DmThread({
           onClose={onEditClose}
         />
       )}
+
+      <PhotoViewer
+        open={photoOpen}
+        src={hasPhoto ? peer.avatar_url : null}
+        name={peer.name}
+        subtitle="Profile picture"
+        onClose={() => setPhotoOpen(false)}
+      />
     </div>
   );
 }

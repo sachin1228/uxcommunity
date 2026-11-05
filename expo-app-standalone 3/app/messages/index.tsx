@@ -24,6 +24,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DmIcon } from '@/components/DmIcon';
 import { PersonAvatar } from '@/components/PersonAvatar';
+import { PhotoViewerModal } from '@/components/PhotoViewerModal';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import { clearDmUnreadLocally } from '@/hooks/useDmUnread';
@@ -31,6 +32,7 @@ import { useDmTyping } from '@/hooks/useDmTyping';
 import { prefetchDmMessages } from '@/lib/dmMessagePrefetch';
 import { rememberDmMessages } from '@/lib/dmMessageStore';
 import { recordDmReadFloor } from '@/lib/dmReadFloor';
+import { resolveProfilePictureUri } from '@/lib/profilePicture';
 import { realtimeClient, realtimeRooms } from '@/lib/realtime';
 import {
   loadDmConversations,
@@ -67,6 +69,10 @@ export default function MessagesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  /** The peer whose face is open full screen — rows with a picture only. */
+  const [photoPeer, setPhotoPeer] = useState<{ name: string; avatar_url: string | null } | null>(
+    null
+  );
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const focusedOnceRef = useRef(false);
   const userIdRef = useRef(userId);
@@ -368,6 +374,7 @@ export default function MessagesScreen() {
               userId={userId ?? ''}
               typingLabel={typingByConversation.get(item.id) ?? null}
               onPress={() => openThread(item)}
+              onPressAvatar={() => setPhotoPeer(item.peer)}
             />
           )}
           ListEmptyComponent={
@@ -385,6 +392,13 @@ export default function MessagesScreen() {
           }
         />
       )}
+
+      <PhotoViewerModal
+        visible={photoPeer !== null}
+        uri={photoPeer ? resolveProfilePictureUri(photoPeer.avatar_url) : null}
+        title="Profile picture"
+        onClose={() => setPhotoPeer(null)}
+      />
     </View>
   );
 }
@@ -394,32 +408,61 @@ function ConversationRow({
   userId,
   typingLabel,
   onPress,
+  onPressAvatar,
 }: {
   conversation: DmConversation;
   userId: string;
   typingLabel: string | null;
   onPress: () => void;
+  /** Opens the peer's photo; the rest of the row still opens the thread. */
+  onPressAvatar?: () => void;
 }) {
   const colors = useColors();
+  // Two press targets share one pressed tint, so the row still reads as a
+  // single surface: the face (photo) and the conversation beside it.
+  const [rowPressed, setRowPressed] = useState(false);
 
   const preview = dmConversationPreview(conversation, userId);
   const incoming = isIncomingRequest(conversation, userId);
+  const peerPhoto = resolveProfilePictureUri(conversation.peer.avatar_url);
+  const canViewPhoto = Boolean(onPressAvatar && peerPhoto);
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${conversation.peer.name}${
-        conversation.unread_count > 0 ? `, ${conversation.unread_count} unread` : ''
-      }`}
-      onPress={onPress}
-      style={({ pressed }) => [
+    <View
+      style={[
         styles.row,
-        pressed && { backgroundColor: colors.surfaceRaised },
+        { backgroundColor: rowPressed ? colors.surfaceRaised : 'transparent' },
       ]}
     >
-      <PersonAvatar name={conversation.peer.name} url={conversation.peer.avatar_url} size={46} />
+      <Pressable
+        onPress={canViewPhoto ? onPressAvatar : onPress}
+        onPressIn={() => setRowPressed(true)}
+        onPressOut={() => setRowPressed(false)}
+        hitSlop={canViewPhoto ? 4 : undefined}
+        accessible={canViewPhoto}
+        accessibilityRole={canViewPhoto ? 'button' : undefined}
+        accessibilityLabel={
+          canViewPhoto ? `View ${conversation.peer.name} photo` : undefined
+        }
+        style={({ pressed }) => (pressed ? styles.avatarPressed : null)}
+      >
+        <PersonAvatar
+          name={conversation.peer.name}
+          url={conversation.peer.avatar_url}
+          size={46}
+        />
+      </Pressable>
 
-      <View style={styles.rowBody}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${conversation.peer.name}${
+          conversation.unread_count > 0 ? `, ${conversation.unread_count} unread` : ''
+        }`}
+        onPress={onPress}
+        onPressIn={() => setRowPressed(true)}
+        onPressOut={() => setRowPressed(false)}
+        style={styles.rowBody}
+      >
         <View style={styles.rowTop}>
           <Text
             style={[
@@ -464,8 +507,8 @@ function ConversationRow({
             </View>
           )}
         </View>
-      </View>
-    </Pressable>
+      </Pressable>
+    </View>
   );
 }
 
@@ -514,6 +557,7 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
   },
   rowBody: { flex: 1, minWidth: 0, gap: 3 },
+  avatarPressed: { opacity: 0.85 },
   rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   peerName: { flex: 1, fontSize: 14.5 },
   time: { fontFamily: 'Geist_400Regular', fontSize: 11.5 },
