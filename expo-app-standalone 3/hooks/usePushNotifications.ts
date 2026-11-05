@@ -31,6 +31,7 @@ import {
 } from '@/lib/pushRegistrationGate';
 import { createPushRotationFollowUp } from '@/lib/pushRotationFollowUp';
 import { cacheCommunityPushSnapshot, prefetchCommunityMessages } from '@/lib/communityMessageStoreRuntime';
+import { cacheDmPushSnapshot, prefetchDmMessages } from '@/lib/dmMessagePrefetch';
 import { consumePendingCommunityNotifications, subscribeCommunityNotificationHints } from '@/lib/chatNotificationState';
 
 export function usePushNotifications() {
@@ -40,6 +41,7 @@ export function usePushNotifications() {
   const lastRegistrationAtRef = useRef(0);
   const userIdRef = useRef<string | null>(user?.id ?? null);
   const pendingCommunityRef = useRef<{ communityId: string; data: Record<string, unknown> } | null>(null);
+  const pendingDmRef = useRef<{ conversationId: string; data: Record<string, unknown> } | null>(null);
 
   const warmCommunity = useCallback((communityId: string, data: Record<string, unknown> = {}) => {
     if (userIdRef.current) {
@@ -47,6 +49,25 @@ export function usePushNotifications() {
       prefetchCommunityMessages(userIdRef.current, communityId);
     } else pendingCommunityRef.current = { communityId, data };
   }, []);
+
+  /**
+   * Same posture for a DM: seed the complete pushed row and start the first
+   * page before the tap's navigation settles. Without the user id yet, keep
+   * the payload for the moment auth resolves.
+   */
+  const warmDm = useCallback((conversationId: string, data: Record<string, unknown> = {}) => {
+    if (userIdRef.current) {
+      cacheDmPushSnapshot(userIdRef.current, data);
+      prefetchDmMessages(userIdRef.current, conversationId);
+    } else pendingDmRef.current = { conversationId, data };
+  }, []);
+
+  const receiveDm = useCallback((conversationId: string, data: Record<string, unknown>) => {
+    // A complete snapshot already paints the thread instantly; receipt alone
+    // must not cost a request for a notification the member may not tap.
+    if (userIdRef.current && cacheDmPushSnapshot(userIdRef.current, data)) return;
+    warmDm(conversationId, data);
+  }, [warmDm]);
 
   const receiveCommunity = useCallback((communityId: string, data: Record<string, unknown>) => {
     // A complete snapshot already warms the local window. A busy foreground
@@ -75,16 +96,21 @@ export function usePushNotifications() {
       warmCommunity(pendingCommunityRef.current.communityId, pendingCommunityRef.current.data);
       pendingCommunityRef.current = null;
     }
-  }, [user?.id, warmCommunity]);
+    if (user?.id && pendingDmRef.current) {
+      warmDm(pendingDmRef.current.conversationId, pendingDmRef.current.data);
+      pendingDmRef.current = null;
+    }
+  }, [user?.id, warmCommunity, warmDm]);
 
   // Receipt can precede navigation by seconds. Start the same deduped read now.
   useEffect(() => {
     const subscription = Notifications.addNotificationReceivedListener((notification) => {
       const data = notification.request.content.data;
       if (data?.type === 'community_message' && typeof data.communityId === 'string') receiveCommunity(data.communityId, data);
+      if (data?.type === 'dm_message' && typeof data.conversationId === 'string') receiveDm(data.conversationId, data);
     });
     return () => subscription.remove();
-  }, [receiveCommunity]);
+  }, [receiveCommunity, receiveDm]);
 
   useEffect(() => {
     const owner = user?.id;
@@ -217,10 +243,11 @@ export function usePushNotifications() {
       const data = pushDataFrom(response);
       if (!data) return;
       if (data.type === 'community_message') warmCommunity(data.communityId, { ...data });
+      if (data.type === 'dm_message') warmDm(data.conversationId, { ...data });
       router.push(routeForPush(data));
     });
     return () => subscription.remove();
-  }, [warmCommunity]);
+  }, [warmCommunity, warmDm]);
 
   // A tap that launched the app from cold, delivered before this mounted.
   useEffect(() => {
@@ -230,11 +257,12 @@ export function usePushNotifications() {
       const data = pushDataFrom(response);
       if (data) {
         if (data.type === 'community_message') warmCommunity(data.communityId, { ...data });
+        if (data.type === 'dm_message') warmDm(data.conversationId, { ...data });
         router.push(routeForPush(data));
       }
     });
     return () => {
       cancelled = true;
     };
-  }, [warmCommunity]);
+  }, [warmCommunity, warmDm]);
 }

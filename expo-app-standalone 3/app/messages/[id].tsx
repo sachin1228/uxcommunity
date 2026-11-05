@@ -52,6 +52,8 @@ import { setActiveDmConversationForNotifications } from '@/lib/chatNotificationS
 import { useDmSend } from '@/hooks/useDmSend';
 import { useDmTyping } from '@/hooks/useDmTyping';
 import { chatCache } from '@/lib/chatCacheStore';
+import { peekDmMessages, rememberDmMessages } from '@/lib/dmMessageStore';
+import { takePrefetchedDmMessages } from '@/lib/dmMessagePrefetch';
 import {
   answerDmRequest,
   blockUser,
@@ -242,11 +244,26 @@ export default function DmThreadScreen() {
       ? unstartedConversation(conversationId, peerId, peerName, params.avatar || null)
       : null),
   );
-  const [messages, setMessages] = useState<DmMessage[]>([]);
+  // A notification tap carries the message itself (or the last visit's window
+  // is still in memory): seed the first frame from it instead of a spinner.
+  const [messages, setMessages] = useState<DmMessage[]>(() =>
+    userId && conversationId
+      ? peekDmMessages(userId, conversationId) ?? []
+      : [],
+  );
   const messagesRef = useRef<DmMessage[]>([]);
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+
+  // The cold-start tap can land before auth resolves the member; seed from
+  // memory as soon as both halves of the key are known.
+  useEffect(() => {
+    if (!userId || !conversationId) return;
+    const seeded = peekDmMessages(userId, conversationId);
+    if (!seeded || seeded.length === 0) return;
+    setMessages((current) => (current.length > 0 ? current : seeded));
+  }, [conversationId, userId]);
 
   // Cold start: paint the thread's last window from disk before the page
   // request answers (see lib/chatCache.ts). The fetch below merges over it.
@@ -276,6 +293,8 @@ export default function DmThreadScreen() {
     if (!userId || !conversationId || messages.length === 0) return;
     if (dataUserIdRef.current !== userId) return;
     if (dataConversationRef.current !== conversationId) return;
+    // The next open in this session paints from here without touching disk.
+    rememberDmMessages(userId, conversationId, messages);
     pendingSaveRef.current = { userId, conversationId, messages };
     if (saveTimerRef.current) return;
     saveTimerRef.current = setTimeout(() => {
@@ -326,6 +345,7 @@ export default function DmThreadScreen() {
     previousUserRef.current = userId;
     dataUserIdRef.current = null;
     dataConversationRef.current = null;
+    readThroughRef.current = null;
     setConversation(null);
     setMessages([]);
     setInitialUnread(null);
@@ -394,6 +414,8 @@ export default function DmThreadScreen() {
     currentUserIdRef.current = userId;
   }, [userId]);
   const initialScrollDoneRef = useRef(false);
+  /** Newest position this open has reported read (for late metadata). */
+  const readThroughRef = useRef<string | null>(null);
   const atBottomRef = useRef(true);
   const listRef = useRef<FlatList<ThreadRow>>(null);
   const dmComposerRef = useRef<ChatComposerHandle>(null);
@@ -447,7 +469,8 @@ export default function DmThreadScreen() {
     previousConversationRef.current = conversationId;
     dataUserIdRef.current = null;
     dataConversationRef.current = null;
-    setMessages([]);
+    readThroughRef.current = null;
+    setMessages(peekDmMessages(userId, conversationId) ?? []);
     setConversation(peekDmConversation(conversationId));
     setInitialUnread(null);
     setHasMore(true);
@@ -475,22 +498,18 @@ export default function DmThreadScreen() {
       // Opening from the list already has the conversation row in the shared
       // cache. Re-reading the whole conversation list here put that (heavy)
       // projection in front of the messages; a deep link or a cold cache still
-      // asks the server for it.
+      // asks the server for it — but only in parallel, never as a gate.
       const known = peekDmConversation(targetId);
-      const [page, conversations] = await Promise.all([
-        getDmMessages(targetId),
-        known
-          ? Promise.resolve<DmConversation[] | null>(null)
-          : loadDmConversations().catch(() => [] as DmConversation[]),
-      ]);
+      const conversationsPromise = known
+        ? Promise.resolve<DmConversation[] | null>(null)
+        : loadDmConversations().catch(() => [] as DmConversation[]);
+
+      // A notification tap started this request (see dmMessagePrefetch); take
+      // that same promise instead of issuing a second one behind navigation.
+      const page = await takePrefetchedDmMessages(ownerId, targetId);
       // The route or the account changed while the page was in flight.
       if (conversationIdRef.current !== targetId) return;
       if (currentUserIdRef.current !== ownerId) return;
-      const found =
-        conversations?.find((row) => row.id === targetId) ??
-        known ??
-        peekDmConversation(targetId) ??
-        synthesizeConversation();
       dataUserIdRef.current = ownerId;
       dataConversationRef.current = targetId;
       // Merge over the cached/hydrated window: the server page wins row by
@@ -502,23 +521,61 @@ export default function DmThreadScreen() {
         return sortMessages([...byId.values()]);
       });
       setHasMore(page.hasMore);
-      setConversation(found);
+      setLoading(false);
       lastLoadedAtRef.current = Date.now();
-      if (found && conversations?.some((row) => row.id === targetId)) {
-        putDmConversation(found);
-      }
 
-      // Snapshot the unread boundary before this open marks everything read.
-      setInitialUnread(null);
-      if (found && found.unread_count > 0) {
+      /**
+       * The unread divider needs the conversation's stored marker, which may
+       * arrive after the messages now. The locally sent read position is a
+       * floor too, so a late (pre-read) row cannot resurrect a divider over
+       * messages this open already marked.
+       */
+      const applyUnreadBoundary = (row: DmConversation | null) => {
+        setInitialUnread(null);
+        if (!row || row.unread_count <= 0) return;
+        const readThrough = readThroughRef.current;
+        const boundary =
+          !row.my_last_read_at
+            ? readThrough
+            : !readThrough
+              ? row.my_last_read_at
+              : Date.parse(readThrough) > Date.parse(row.my_last_read_at)
+                ? readThrough
+                : row.my_last_read_at;
         const firstUnread = page.messages.find(
           (message) =>
-            message.user_id === found.peer.id &&
-            (!found.my_last_read_at || message.created_at > found.my_last_read_at),
+            message.user_id === row.peer.id &&
+            (!boundary || message.created_at > boundary),
         );
         if (firstUnread) {
-          setInitialUnread({ id: firstUnread.id, count: found.unread_count });
+          setInitialUnread({ id: firstUnread.id, count: row.unread_count });
         }
+      };
+
+      // Messages paint first; the list projection only decides the footer and
+      // the divider, so it lands behind them.
+      const immediate = known ?? peekDmConversation(targetId);
+      if (immediate) {
+        setConversation(immediate);
+        applyUnreadBoundary(immediate);
+      }
+
+      const conversations = await conversationsPromise;
+      if (conversationIdRef.current !== targetId) return;
+      if (currentUserIdRef.current !== ownerId) return;
+      const found =
+        conversations?.find((row) => row.id === targetId) ??
+        peekDmConversation(targetId) ??
+        immediate ??
+        synthesizeConversation();
+      if (found) {
+        setConversation(found);
+        if (conversations?.some((row) => row.id === targetId)) {
+          putDmConversation(found);
+        }
+        // The immediate row already supplied the boundary; a late read must
+        // not make that same divider disappear under the reader.
+        if (!immediate) applyUnreadBoundary(found);
       }
     } catch (e) {
       if (conversationIdRef.current !== targetId) return;
@@ -631,6 +688,7 @@ export default function DmThreadScreen() {
       createDmReadCoalescer({
         throttleMs: MARK_READ_THROTTLE_MS,
         send: (messageId) => {
+          readThroughRef.current = messageId;
           void markDmRead(conversationId, messageId)
             .then(() => {
               readFailedRef.current = false;

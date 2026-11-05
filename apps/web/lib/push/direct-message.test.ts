@@ -57,6 +57,7 @@ test("quiet hours and the silent choice keep the push but drop the buzz", () => 
 
 test("a DM push wears the sender, the preview and a per-conversation collapse id", () => {
   const [message] = directMessagePushMessages(["ExpoPushToken[one]"], {
+    recipientId: "u-1",
     conversationId: "dm-1",
     messageId: "m-1",
     senderId: "u-2",
@@ -66,6 +67,7 @@ test("a DM push wears the sender, the preview and a per-conversation collapse id
     hasImage: false,
     isReply: false,
     audible: true,
+    createdAt: "2026-10-23T19:59:00Z",
   });
 
   assert.equal(message.title, "John");
@@ -80,12 +82,46 @@ test("a DM push wears the sender, the preview and a per-conversation collapse id
     senderId: "u-2",
     senderName: "John",
     senderAvatarUrl: "https://media.example/john.webp",
+    recipientId: "u-1",
     silent: false,
+    dmMessage: JSON.stringify({
+      id: "m-1",
+      conversation_id: "dm-1",
+      user_id: "u-2",
+      content: "Hi there",
+      image_url: null,
+      reply_to_id: null,
+      created_at: "2026-10-23T19:59:00Z",
+      sender_name: "John",
+      sender_avatar_url: "https://media.example/john.webp",
+      reply_sender_name: null,
+      reply_sender_id: null,
+    }),
   });
+});
+
+test("an oversized DM is pushed without the snapshot, never not at all", () => {
+  const [message] = directMessagePushMessages(["ExpoPushToken[one]"], {
+    recipientId: "u-1",
+    conversationId: "dm-1",
+    messageId: "m-1",
+    senderId: "u-2",
+    senderName: "John",
+    senderAvatarUrl: null,
+    content: "x".repeat(1_900),
+    hasImage: false,
+    isReply: false,
+    audible: true,
+    createdAt: "2026-10-23T19:59:00Z",
+  });
+
+  assert.equal(message.data?.dmMessage, undefined);
+  assert.equal(message.body.length > 0, true);
 });
 
 test("an image-only DM previews as a photo", () => {
   const [message] = directMessagePushMessages(["ExpoPushToken[one]"], {
+    recipientId: "u-1",
     conversationId: "dm-1",
     messageId: "m-2",
     senderId: "u-2",
@@ -104,6 +140,7 @@ test("an image-only DM previews as a photo", () => {
 
 test("the direct-FCM DM payload carries the sender photo and conversation", () => {
   const data = directMessageFcmData({
+    recipientId: "u-1",
     conversationId: "dm-1",
     messageId: "m-1",
     senderId: "u-2",
@@ -114,18 +151,21 @@ test("the direct-FCM DM payload carries the sender photo and conversation", () =
     isReply: false,
     audible: true,
     timestamp: 1234,
+    createdAt: "2026-10-23T19:59:00Z",
   });
 
   assert.equal(data.type, "dm_message");
   assert.equal(data.direct, "1");
   assert.equal(data.conversationId, "dm-1");
   assert.equal(data.senderId, "u-2");
+  assert.equal(data.recipientId, "u-1");
   assert.equal(data.title, "John");
   assert.equal(data.message, "Hi there");
   assert.equal(data.imageUrl, "https://media.example/john.webp");
   assert.equal(data.senderAvatarUrl, "https://media.example/john.webp");
   assert.equal(data.silent, "0");
   assert.equal(data.timestamp, "1234");
+  assert.equal(JSON.parse(data.dmMessage).id, "m-1");
 });
 
 // ── Delivery shape (fake database, fake providers) ──────────────────────
@@ -351,6 +391,7 @@ test("a successful FCM send does not also turn the Android Expo token into a not
 
 test("a DM without a photo uses the app's exact initials and palette color", () => {
   const data = directMessageFcmData({
+    recipientId: "u-1",
     conversationId: "dm-1",
     messageId: "m-1",
     senderId: "u-2",
