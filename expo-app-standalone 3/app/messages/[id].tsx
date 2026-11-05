@@ -209,9 +209,11 @@ export default function DmThreadScreen() {
     <ChatScrollView {...props} bottomInset={listInset} transition={listTransition} followThreshold={24} />
   ), [listInset, listTransition]);
   /**
-   * The thread waits for the push animation to finish before it mounts its
-   * rows — creating them mid-slide is what made the open stutter (see
-   * hooks/useScreenTransitionSettled).
+   * The unread anchor waits for the push animation to finish before it
+   * scrolls — moving the list mid-slide is what made the open stutter (see
+   * hooks/useScreenTransitionSettled). The cached window itself paints at
+   * once, like the community chat: holding it behind a spinner showed
+   * loading over content that was already available.
    */
   const listSettled = useScreenTransitionSettled();
   const { user } = useAuth();
@@ -1304,6 +1306,19 @@ export default function DmThreadScreen() {
     loading &&
     messages.length === 0 &&
     (!conversation || conversation.last_message_at !== null);
+  /**
+   * A quick disk read should paint directly, without a flashing spinner —
+   * same 150 ms grace the community chat uses.
+   */
+  const [showLoading, setShowLoading] = useState(false);
+  useEffect(() => {
+    if (!awaitingFirstPage) {
+      setShowLoading(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowLoading(true), 150);
+    return () => clearTimeout(timer);
+  }, [awaitingFirstPage]);
   const unstarted = conversation ? isUnstartedRequest(conversation) : false;
   const displayPeerName = conversation?.peer.name ?? peerName;
   const displayPeerAvatar = conversation?.peer.avatar_url ?? (params.avatar || null);
@@ -1431,9 +1446,15 @@ export default function DmThreadScreen() {
       </View>
 
       {awaitingFirstPage ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.accent} />
-        </View>
+        showLoading ? (
+          <View style={styles.center}>
+            <ActivityIndicator color={colors.accent} />
+          </View>
+        ) : (
+          // The disk window often lands within a frame or two; a blank beat
+          // beats a spinner flashing over messages that are already cached.
+          <View style={styles.flex} />
+        )
       ) : error && messages.length === 0 ? (
         <View style={styles.center}>
           <Feather name="wifi-off" size={28} color={colors.foregroundMuted} />
@@ -1455,16 +1476,22 @@ export default function DmThreadScreen() {
         <>
           <View style={styles.flex}>
             <View style={styles.flex}>
-            {listSettled ? (
               <FlatList
                 ref={listRef}
                 inverted
                 renderScrollComponent={renderChatScrollView}
                 data={rows}
                 keyExtractor={(row) => row.key}
-                // A cached window paints at once; the anchor runs when the page
-                // request settles and may move it to the unread divider.
-                style={[styles.flex, { opacity: initialPositionResolved || messages.length > 0 ? 1 : 0 }]}
+                // A cached window paints at once; the anchor runs when the push
+                // transition settles and may move it to the unread divider.
+                // An empty thread (no rows, nothing loading) is ready too.
+                style={[
+                  styles.flex,
+                  {
+                    opacity:
+                      initialPositionResolved || messages.length > 0 || !loading ? 1 : 0,
+                  },
+                ]}
                 contentContainerStyle={styles.list}
                 keyboardDismissMode="on-drag"
                 maintainVisibleContentPosition={atBottom ? undefined : { minIndexForVisible: 0 }}
@@ -1525,11 +1552,6 @@ export default function DmThreadScreen() {
                   </View>
                 }
               />
-            ) : (
-              <View style={styles.center}>
-                <ActivityIndicator color={colors.accent} />
-              </View>
-            )}
 
             <Animated.View
               pointerEvents="none"
