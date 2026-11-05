@@ -13,6 +13,7 @@ import { useColors } from '@/hooks/useColors';
 import { Message } from '@/lib/communities';
 import { canEditMessage } from '@/lib/chat';
 import { hapticSelection } from '@/lib/haptics';
+import { AnimatedEmoji } from './AnimatedEmoji';
 
 /**
  * The five quick reactions, in the same order and with the same active-state
@@ -154,7 +155,7 @@ export function MessageActionsSheet({
                           },
                         ]}
                       >
-                        <Text style={styles.reactionEmoji}>{emoji}</Text>
+                        <AnimatedEmoji emoji={emoji} size={20} play />
                       </Pressable>
                     );
                   })}
@@ -303,7 +304,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
   },
-  reactionEmoji: { fontSize: 22 },
 
   actionRow: {
     flexDirection: 'row',

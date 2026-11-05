@@ -22,6 +22,7 @@ import {
   Text,
   View,
   type ScrollViewProps,
+  type ViewToken,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -32,6 +33,7 @@ import { EditMessageModal } from '@/components/chat/EditMessageModal';
 import { ImageViewer, type LightboxImage } from '@/components/chat/ImageViewer';
 import { MessageActionsSheet } from '@/components/chat/MessageActionsSheet';
 import { MessageBubble } from '@/components/chat/MessageBubble';
+import { createMessageVisibilityStore } from '@/lib/messageVisibility';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { DmComposer } from '@/components/dm/DmComposer';
 import { EmojiPicker } from '@/components/chat/EmojiPicker';
@@ -177,6 +179,19 @@ export default function DmThreadScreen() {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const imeLayout = useChatImeLayout(isFocused, { nativeListInsets: true });
+  /** Rows currently on screen — animated emoji only fetch/play while visible. */
+  const visibilityStore = useRef(createMessageVisibilityStore()).current;
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      visibilityStore.setVisible(
+        new Set(viewableItems.map((token) => String(token.key))),
+      );
+    },
+  ).current;
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 1 }).current;
+  useEffect(() => {
+    if (!isFocused) visibilityStore.setVisible(new Set());
+  }, [isFocused, visibilityStore]);
   const { listInset, listTransition } = imeLayout;
   const renderChatScrollView = useCallback((props: ScrollViewProps) => (
     <ChatScrollView {...props} bottomInset={listInset} transition={listTransition} followThreshold={24} />
@@ -1296,6 +1311,7 @@ export default function DmThreadScreen() {
         highlighted={flashMessageId === item.msg.id}
         actionsOpen={selectedMessage?.id === item.msg.id}
         variant="dm"
+        visibility={visibilityStore}
       />
     );
   }, [
@@ -1310,6 +1326,7 @@ export default function DmThreadScreen() {
     openPeerProfile,
     selectedMessage?.id,
     userId,
+    visibilityStore,
   ]);
 
   return (
@@ -1413,6 +1430,8 @@ export default function DmThreadScreen() {
                 onScrollBeginDrag={imeLayout.closePanel}
                 onEndReached={() => void loadMore()}
                 onEndReachedThreshold={0.3}
+                onViewableItemsChanged={onViewableItemsChanged}
+                viewabilityConfig={viewabilityConfig}
                 onScrollToIndexFailed={(info) => {
                   listRef.current?.scrollToOffset({
                     offset: Math.max(0, info.averageItemLength * info.index),
