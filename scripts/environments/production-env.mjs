@@ -20,6 +20,8 @@ export function productionFiles(config, env) {
     runtime[key]=env[key];
   }
   runtime.INVITATION_EXPIRY_DAYS=env.INVITATION_EXPIRY_DAYS || '7';
+  // Optional: cities use Wikipedia photos until a Pexels key is provided.
+  if(env.PEXELS_API_KEY)runtime.PEXELS_API_KEY=env.PEXELS_API_KEY;
   if(!env.API_URL)throw new Error('Missing production secret: API_URL');
   const dotenv=values=>Object.entries(values).map(([k,v])=>`${k}=${JSON.stringify(v)}`).join('\n')+'\n';
   return {

@@ -40,8 +40,11 @@ export function FetchMasterImages({ entity, table, apiBase, onUpdated }: FetchMa
   const [results, setResults] = useState<Record<string, ItemStatus>>({});
   const [updatedCount, setUpdatedCount] = useState(0);
   const [failedCount, setFailedCount] = useState(0);
+  const [imageSource, setImageSource] = useState<"pexels" | "wikipedia">("wikipedia");
+  const [pexelsConfigured, setPexelsConfigured] = useState(true);
 
   const entities = entity.toLowerCase() + (eligible.length === 1 ? "" : "s");
+  const sourceLabel = imageSource === "pexels" ? "Pexels" : "Wikipedia";
 
   async function loadPreview() {
     setOpen(true);
@@ -60,6 +63,8 @@ export function FetchMasterImages({ entity, table, apiBase, onUpdated }: FetchMa
       }
       setEligible(data.eligible ?? []);
       setSkippedCount((data.skipped ?? []).length);
+      setImageSource(data.imageSource === "pexels" ? "pexels" : "wikipedia");
+      setPexelsConfigured(data.pexelsConfigured !== false);
       setPhase("confirm");
     } catch {
       setLoadError("Network error. Please try again.");
@@ -141,7 +146,7 @@ export function FetchMasterImages({ entity, table, apiBase, onUpdated }: FetchMa
           <div>
             <p className="font-body text-xs text-foreground-muted mb-4">
               {loadError ??
-                `This will fetch a Wikipedia photo for ${total} ${entities} and set it as the ${entity.toLowerCase()} image. ${skippedCount > 0 ? `${skippedCount} item${skippedCount === 1 ? "" : "s"} will be skipped (the "Other" catch-all option).` : ""}`}
+                `This will fetch a ${sourceLabel} photo for ${total} ${entities} and set it as the ${entity.toLowerCase()} image. ${skippedCount > 0 ? `${skippedCount} item${skippedCount === 1 ? "" : "s"} will be skipped (the "Other" catch-all option).` : ""}${table === "cities" && !pexelsConfigured ? " PEXELS_API_KEY isn't set, so cities fall back to Wikipedia photos." : ""}`}
             </p>
 
             {loadError && (

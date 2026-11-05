@@ -151,6 +151,7 @@ jobs:
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           INVITATION_EXPIRY_DAYS: ${{ secrets.INVITATION_EXPIRY_DAYS }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
         run: node scripts/environments/production-env.mjs
 
       # ── The media credential every upload route uses ────────────────────

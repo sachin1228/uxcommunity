@@ -267,6 +267,7 @@ Copy the APK to the device (Drive, chat, USB) and open it there, allowing "insta
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key — server-only, never expose to the client |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL`, `R2_PRIVATE_BUCKET_NAME` | Cloudflare R2 credentials, the public media bucket + delivery domain, and the private bucket used for résumés, verification samples and DM images (public access disabled; no custom domain). Both deploy workflows prove these can write before they build — see [Rotating the R2 media credentials](#rotating-the-r2-media-credentials) |
 | `GIPHY_API_KEY` | GIPHY API key for GIF/sticker search |
+| `PEXELS_API_KEY` | Pexels API key for Admin → Cities → Fetch images (optional; cities fall back to Wikipedia photos when unset) |
 | `SESSION_SECRET` | Secret used to sign JWT session tokens (`openssl rand -base64 32`) |
 | `ADMIN_EMAIL` | Email address for the single built-in admin account |
 | `ADMIN_PASSWORD` | Plain-text password for the admin account |

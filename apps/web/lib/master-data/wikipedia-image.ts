@@ -7,20 +7,14 @@
  * falls back to a search hit when no exact page exists.
  */
 
+import { downloadImage, fetchWithRetry, type FetchedImage } from "./image-fetch";
+
 // Wikimedia's public API asks clients to send a descriptive User-Agent so
 // misbehaving bots can be identified. Sequential requests (one per row) are
 // well within their rate limits.
 const WIKIPEDIA_UA = "FreebuffAdmin/1.0 (admin master-data image sync)";
 const WIKIPEDIA_API = "https://en.wikipedia.org/api/rest_v1";
 const WIKIPEDIA_ACTION_API = "https://en.wikipedia.org/w/api.php";
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // match the manual upload limit
-const ACCEPTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-
-export interface FetchedImage {
-  source: string;
-  contentType: string;
-  bytes: Buffer;
-}
 
 interface ThumbPage {
   index?: number;
@@ -87,7 +81,7 @@ export async function findWikipediaImage(query: string): Promise<FetchedImage | 
   }
 
   for (const candidate of candidates) {
-    const image = await downloadImage(candidate);
+    const image = await downloadImage(candidate, WIKIPEDIA_UA);
     if (image) return image;
   }
   return null;
@@ -151,34 +145,4 @@ function searchQueryVariants(query: string): string[] {
   return variants;
 }
 
-/** Fetches with a short retry/backoff so Wikimedia rate limits (429) don't fail a row. */
-async function fetchWithRetry(
-  url: string,
-  init: RequestInit,
-  attempts = 3
-): Promise<Response | null> {
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    try {
-      const res = await fetch(url, init);
-      if (res.status === 429 || res.status >= 500) {
-        await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
-        continue;
-      }
-      return res;
-    } catch {
-      if (attempt === attempts) return null;
-      await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
-    }
-  }
-  return null;
-}
 
-async function downloadImage(source: string): Promise<FetchedImage | null> {
-  const res = await fetchWithRetry(source, { headers: { "User-Agent": WIKIPEDIA_UA } });
-  if (!res) return null;
-  const contentType = (res.headers.get("content-type") ?? "").split(";")[0].trim();
-  if (!ACCEPTED_IMAGE_TYPES.has(contentType)) return null;
-  const bytes = Buffer.from(await res.arrayBuffer());
-  if (bytes.length === 0 || bytes.length > MAX_IMAGE_BYTES) return null;
-  return { source, contentType, bytes };
-}

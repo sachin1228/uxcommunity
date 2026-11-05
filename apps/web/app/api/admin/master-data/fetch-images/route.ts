@@ -9,6 +9,7 @@ import { shouldAutoFetchImage } from "@/lib/master-data/eligibility";
 import { MASTER_TABLES, type MasterTable } from "@/lib/master-data/master-tables";
 import { syncMasterImageToCommunities } from "@/lib/master-data/mirror-image";
 import { findWikipediaImage } from "@/lib/master-data/wikipedia-image";
+import { findPexelsImage, isPexelsConfigured } from "@/lib/master-data/pexels-image";
 
 // `as const` keeps each table name a string literal: the Supabase query
 // builder types a table as a literal, so a `Record<..., { table: string }>`
@@ -62,14 +63,20 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ eligible, skipped });
+  return NextResponse.json({
+    eligible,
+    skipped,
+    imageSource: table === "cities" && isPexelsConfigured() ? "pexels" : "wikipedia",
+    pexelsConfigured: isPexelsConfigured(),
+  });
 }
 
 /**
- * POST — fetch a Wikipedia image for a single master-data row, upload it to
- * R2, and attach it to the row. The admin UI loops over eligible rows one at
- * a time so progress is visible per row; each row is updated independently,
- * so a failure for one never blocks the rest.
+ * POST — fetch a photo for a single master-data row (Pexels for cities,
+ * Wikipedia for everything else), upload it to R2, and attach it to the row.
+ * The admin UI loops over eligible rows one at a time so progress is visible
+ * per row; each row is updated independently, so a failure for one never
+ * blocks the rest.
  */
 export async function POST(request: NextRequest) {
   try { await requireSession("admin"); } catch (e) { return e as Response; }
@@ -99,11 +106,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const image = await findWikipediaImage(row.name);
+  const image =
+    body.table === "cities" && isPexelsConfigured()
+      ? (await findPexelsImage(row.name)) ?? (await findWikipediaImage(row.name))
+      : await findWikipediaImage(row.name);
   if (!image) {
     return NextResponse.json({
       ok: false,
-      error: `No Wikipedia image found for "${row.name}".`,
+      error: `No image found for "${row.name}".`,
     });
   }
 
