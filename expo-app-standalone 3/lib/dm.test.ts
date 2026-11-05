@@ -212,14 +212,28 @@ test('unread pill caps at 99+', () => {
   assert.equal(unreadPillLabel(150), '99+');
 });
 
-test('timestamp buckets match the rest of the app', () => {
+test('the list stamp matches the community rows', () => {
   const now = Date.parse('2026-01-10T12:00:00.000Z');
   const at = (offsetMs: number) => new Date(now - offsetMs).toISOString();
 
-  assert.equal(dmTimestampLabel(at(10_000), now), 'now');
-  assert.equal(dmTimestampLabel(at(5 * 60_000), now), '5m');
-  assert.equal(dmTimestampLabel(at(3 * 3_600_000), now), '3h');
-  assert.equal(dmTimestampLabel(at(2 * 86_400_000), now), '2d');
+  const today = new Date(now - 10_000);
+  assert.equal(
+    dmTimestampLabel(at(10_000), now),
+    today.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  );
+  assert.equal(dmTimestampLabel(at(86_400_000), now), 'Yesterday');
+
+  const weekday = new Date(now - 3 * 86_400_000);
+  assert.equal(
+    dmTimestampLabel(at(3 * 86_400_000), now),
+    weekday.toLocaleDateString([], { weekday: 'short' }),
+  );
+
+  const older = new Date(now - 10 * 86_400_000);
+  assert.equal(
+    dmTimestampLabel(at(10 * 86_400_000), now),
+    older.toLocaleDateString([], { month: 'short', day: 'numeric' }),
+  );
   assert.equal(dmTimestampLabel(null, now), '');
 });
 

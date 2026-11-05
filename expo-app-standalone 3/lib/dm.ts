@@ -282,21 +282,23 @@ export function bumpConversationWithMessage(
   return [bumped, ...conversations.filter((row) => row.id !== current.id)];
 }
 
-/** "2h" / "3d" / "12 Oct" — the list row's stamp (web timeAgo-style buckets). */
+/**
+ * The list row's stamp, matching the community rows: a clock time today,
+ * "Yesterday", a weekday inside the week, then a short date.
+ */
 export function dmTimestampLabel(iso: string | null, now: number = Date.now()): string {
   if (!iso) return '';
   const at = Date.parse(iso);
   if (!Number.isFinite(at)) return '';
-  const diff = now - at;
-  const minute = 60_000;
-  const hour = 60 * minute;
-  const day = 24 * hour;
+  const date = new Date(at);
+  const daysAgo = Math.floor((now - at) / 86_400_000);
 
-  if (diff < minute) return 'now';
-  if (diff < hour) return `${Math.floor(diff / minute)}m`;
-  if (diff < day) return `${Math.floor(diff / hour)}h`;
-  if (diff < 7 * day) return `${Math.floor(diff / day)}d`;
-  return new Date(at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  if (daysAgo <= 0) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  if (daysAgo === 1) return 'Yesterday';
+  if (daysAgo < 7) return date.toLocaleDateString([], { weekday: 'short' });
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
 /** Client nonce for send idempotency — the server only needs UUID shape. */
