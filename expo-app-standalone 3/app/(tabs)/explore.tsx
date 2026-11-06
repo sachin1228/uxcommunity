@@ -382,6 +382,7 @@ function ExploreTabSession({
         <SectionList
           sections={sections}
           keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingBottom: insets.bottom + 96 }}
           stickySectionHeadersEnabled={false}
