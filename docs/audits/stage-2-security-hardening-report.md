@@ -3,7 +3,7 @@
 **Date:** 2026-11-06
 **Branch:** `security/stage-2-hardening`
 **Base:** `main` @ `c5926c80`
-**Audit:** `docs/audits/overall-repository-audit-2026-11.md` (PR #794)
+**Audit:** the 2026-11 overall repository audit (PR #794).
 **Scope:** AUD-05, AUD-06, AUD-07, AUD-08, AUD-10, AUD-49, AUD-50.
 **Constraint:** No production data, infrastructure, credentials or deployments were touched. Nothing was deployed.
 
