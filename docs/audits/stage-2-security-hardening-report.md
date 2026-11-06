@@ -25,7 +25,7 @@ No security assertion was weakened to make a test pass. Two stale test fixtures 
 |---|---|---|---|
 | **AUD-05** Rate limiting fail-open | P1 | **FIXED AND VERIFIED** | Added `strict` (default) and `availability` modes. Production missing Upstash config fails closed; timeout/5xx/quota use a bounded per-isolate fallback with a 1.5 s Redis deadline and structured `rate_limit.degraded` logs. Global middleware, `/api/auth/me` and DM typing opt into availability. Added runtime tests and a static route audit. |
 | **AUD-06** `javascript:` profile URLs | P1 in sprint | **FIXED AND VERIFIED** | Added `lib/security/safe-url.ts` and `lib/profile/urls.ts`. `PATCH /api/profile` now rejects non-http(s), credentialed, malformed and overlong links with 422; LinkedIn must be on `linkedin.com`. Admin user card and admin verification page render through `safeExternalUrl`; public profile reuses the same helper; Zod URL fields require http(s). Added unit tests. |
-| **AUD-07** Presigned upload size/ownership | P1 in sprint | **IMPLEMENTED, LIVE VERIFICATION REQUIRED** | A claim-based finalize state machine: one atomic claim per ticket, a random claim token + lease, a claim-specific final key, staging/copy ETag comparison, and a token-guarded commit. A losing/late finalize cannot commit or overwrite the winner; a concurrent staging PUT between HEAD and copy changes the ETag and is rejected before commit. Finalized retries return the committed attachment; a lost commit response is resolved by re-reading the stored final key. Unit tests cover ownership, reuse, expiry, size/type/ETag mismatch, claim-key isolation and lost-commit resolution; SQL tests cover claim/lease/release/commit races. Live R2 ETag/copy behaviour and the migration remain to be exercised on staging. |
+| **AUD-07** Presigned upload size/ownership | P1 in sprint | **IMPLEMENTED, LIVE VERIFICATION REQUIRED** | A claim-based finalize state machine: one atomic claim per ticket, a random claim token + lease, a claim-specific final key, staging/copy ETag comparison, and a token-guarded commit. A losing/late finalize cannot commit or overwrite the winner; a concurrent staging PUT between HEAD and copy changes the ETag and is rejected before commit. Finalized retries return the committed attachment; a lost commit response is resolved by re-reading the stored final key. Unit tests cover ownership, reuse, expiry, size/type/ETag mismatch, claim-key isolation and lost-commit resolution; SQL tests cover claim/lease/release/commit races and pass in CI. Live R2 ETag/copy behaviour and the staging apply remain. |
 | **AUD-08** Push after implicit sign-out | P1 in sprint | **IMPLEMENTED, LIVE VERIFICATION REQUIRED** | `createSignOutCoordinator` now detaches the push token before clearing the session cookie, bounded by the existing 2.5 s timeout; explicit logout already did this. The Android FCM service drops messages when the native signed-in user is null and drops a direct message whose `recipientId` differs; the JS foreground handler suppresses presentation/badges when signed out. Unit tests pass; real-device FCM and a rebuilt APK remain. |
 | **AUD-10** Android backup | P1 in sprint | **IMPLEMENTED, LIVE VERIFICATION REQUIRED** | `android.allowBackup: false` in `app.json` plus `plugins/withAndroidBackupPolicy.js`, which also sets `fullBackupContent`/`dataExtractionRules` and writes exclusion rules for every app-data domain on prebuild. A source-of-truth test asserts both. A regenerated manifest/APK remains to be inspected on a device. |
 | **AUD-49** Server-side socket limits | P1 in sprint | **FIXED AND VERIFIED** | Added per-user (default 12) and per-session (default 8) caps in the Room DO, oldest-socket eviction (close `4008`), a per-member upgrade token bucket, a production-only per-IP handshake damper (1,200 burst / 200 per second, sized for a shared NAT), optional env overrides, and metrics. Tests prove caps/eviction, reconnection, 3 devices × 2 tabs staying connected, and 50,000-socket fan-out. |
@@ -185,7 +185,8 @@ The Stage 2 prompt's "additional security checks" were inspected. No new verifie
 | `npm run test:mobile-security` | **18 / 18 pass** |
 | `npm run test:mobile-realtime` | **72 / 72 pass** |
 | `node scripts/audit-comments.mjs` | **PASS** (1,605 files, 7 rules) |
-| SQL tests `media_upload_tickets.test.sql`, `realtime_membership_revocations.test.sql` | Not run locally (no Docker/local Supabase runtime in this session); both are wired into the database workflow and run against the fresh migrated schema in CI. |
+| Database workflow `fresh-database` | **PASS** — both new SQL suites ran against the fully migrated fresh schema in CI (run `42168120925`). |
+| SQL tests `media_upload_tickets.test.sql`, `realtime_membership_revocations.test.sql` | **PASS in CI**; not run locally (no Docker/local Supabase runtime in this session). |
 
 ## 8. Migrations required
 
@@ -286,7 +287,7 @@ The limits are **per room**: 12 sockets per user and 8 per session, with oldest-
 - Realtime integration: **31 / 31 pass** solo (50,000/50,000); socket limits: **6 / 6 integration**, **8 / 8 pure**, routing **28 / 28**; remaining non-perf suites: **239 / 239**.
 - Mobile: `tsc` clean, security **18 / 18**, realtime **72 / 72**.
 - Comment audit clean.
-- SQL state-machine tests are wired into the database workflow (not run locally — no Docker/local Supabase runtime).
+- SQL state-machine tests pass in the CI `fresh-database` job (run `42168120925`); they were not run locally because this machine has no Docker/local Supabase runtime.
 
 **Status after second pass:** AUD-07 remains **IMPLEMENTED, LIVE VERIFICATION REQUIRED**; AUD-50 is **FIXED AND VERIFIED** (durable delivery, failure/retry tests) with a staging outage drill still recommended; AUD-49 remains **FIXED AND VERIFIED** including legitimate multi-device use.
 
@@ -297,7 +298,7 @@ The limits are **per room**: 12 sockets per user and 8 per session, with oldest-
 1. **Findings fixed:** 4 (AUD-05, AUD-06, AUD-49, AUD-50).
 2. **Findings implemented, live verification required:** 3 (AUD-07, AUD-08, AUD-10).
 3. **Findings still open / out of sprint:** all other audit findings listed in §3.
-4. **Tests:** web 1,174/1,174; mobile security 18/18; mobile realtime 72/72; realtime socket limits 6/6 integration + 8/8 pure; revocation 6/6; integration 31/31 solo; routing/socket pure 36/36; remaining non-perf realtime 239/239; comment audit clean; two SQL state-machine suites wired into CI.
+4. **Tests:** web 1,174/1,174; mobile security 18/18; mobile realtime 72/72; realtime socket limits 6/6 integration + 8/8 pure; revocation 6/6; integration 31/31 solo; routing/socket pure 36/36; remaining non-perf realtime 239/239; comment audit clean; two SQL state-machine suites pass in CI.
 5. **Files changed:** see §4.
 6. **Required operator actions:** apply both migrations; ensure Upstash is present; prebuild/rebuild the Android app; run the staging matrix in §11 (including concurrent-finalize/overwrite and realtime-outage drills); run miniflare suites serially.
 7. **Migration requirements:** two forward migrations (`20261106120000_media_upload_tickets.sql`, `20261106130000_realtime_membership_revocations.sql`).
