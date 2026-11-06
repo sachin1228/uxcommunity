@@ -183,16 +183,21 @@ select is(
 );
 
 -- ─── Release and retry ─────────────────────────────────────
-insert into public.media_upload_tickets
-  (media_id, user_id, community_id, staging_key, content_type, expected_size, expires_at)
-select gen_random_uuid(), user_id, community_id,
-       'media/videos/processed/' || gen_random_uuid() || '.mp4',
-       'video/mp4', 1000, now() + interval '10 minutes'
-from ticket_fixture;
+create temporary table release_ticket (media_id uuid);
+with inserted as (
+  insert into public.media_upload_tickets
+    (media_id, user_id, community_id, staging_key, content_type, expected_size, expires_at)
+  select gen_random_uuid(), user_id, community_id,
+         'media/videos/processed/' || gen_random_uuid() || '.mp4',
+         'video/mp4', 1000, now() + interval '10 minutes'
+  from ticket_fixture
+  returning media_id
+)
+insert into release_ticket select media_id from inserted;
 
 select is(
   (select count(*)::int from public.claim_media_upload_ticket(
-    (select media_id from public.media_upload_tickets order by created_at desc limit 1),
+    (select media_id from release_ticket),
     (select user_id from ticket_fixture),
     (select community_id from ticket_fixture),
     'aaaaaaaa-7777-4777-8777-777777777777',
@@ -204,7 +209,7 @@ select is(
 
 select is(
   public.release_media_upload_ticket(
-    (select media_id from public.media_upload_tickets order by created_at desc limit 1),
+    (select media_id from release_ticket),
     'aaaaaaaa-7777-4777-8777-777777777777',
     'transient copy failure'
   ),
@@ -214,7 +219,7 @@ select is(
 
 select is(
   public.commit_media_upload_ticket(
-    (select media_id from public.media_upload_tickets order by created_at desc limit 1),
+    (select media_id from release_ticket),
     'aaaaaaaa-7777-4777-8777-777777777777',
     'media/videos/finalized/released.mp4',
     null,
@@ -226,7 +231,7 @@ select is(
 
 select is(
   public.reject_media_upload_ticket(
-    (select media_id from public.media_upload_tickets order by created_at desc limit 1),
+    (select media_id from release_ticket),
     'aaaaaaaa-7777-4777-8777-777777777777',
     'not the claim'
   ),
@@ -236,7 +241,7 @@ select is(
 
 select is(
   (select count(*)::int from public.claim_media_upload_ticket(
-    (select media_id from public.media_upload_tickets order by created_at desc limit 1),
+    (select media_id from release_ticket),
     (select user_id from ticket_fixture),
     (select community_id from ticket_fixture),
     'bbbbbbbb-8888-4888-8888-888888888888',
@@ -248,9 +253,9 @@ select is(
 
 select is(
   public.commit_media_upload_ticket(
-    (select media_id from public.media_upload_tickets order by created_at desc limit 1),
+    (select media_id from release_ticket),
     'bbbbbbbb-8888-4888-8888-888888888888',
-    'media/videos/finalized/' || (select media_id from public.media_upload_tickets order by created_at desc limit 1) || '/bbbbbbbb-8888-4888-8888-888888888888.mp4',
+    'media/videos/finalized/' || (select media_id from release_ticket) || '/bbbbbbbb-8888-4888-8888-888888888888.mp4',
     null,
     1000
   ),
