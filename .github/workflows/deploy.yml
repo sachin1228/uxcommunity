@@ -57,19 +57,10 @@ jobs:
       # This rejects a stale queued release instead of publishing older code
       # under the assumption that it is the current main.
       - name: Verify the release commit
-        shell: bash
-        run: |
-          set -euo pipefail
-          checked_out=$(git rev-parse HEAD)
-          echo "Dispatch SHA:  $GITHUB_SHA"
-          echo "Checked out:   $checked_out"
-          echo "Required CI:   ${{ needs.ci.result }}"
-          test "$checked_out" = "$GITHUB_SHA"
-          current_main=$(git ls-remote origin refs/heads/main | cut -f1)
-          if [ "$current_main" != "$GITHUB_SHA" ]; then
-            echo "::error::main moved to $current_main after this release was dispatched for $GITHUB_SHA. Re-dispatch the workflow for the new commit."
-            exit 1
-          fi
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          CI_RESULT: ${{ needs.ci.result }}
+        run: bash scripts/verify-release-commit.sh
 
       # wrangler 4.x requires Node >= 22, so use 22 (LTS) even though the
       # app itself builds fine on Node 20.

@@ -67,8 +67,14 @@ test("release signing is fail-closed and debug stays on the debug key", () => {
   assert.match(signingPlugin, /GradleException/);
   assert.match(signingPlugin, /debug keystore/);
   assert.match(signingPlugin, /task\.name\.contains\("Release"\)/);
-  // EAS injects its own credential configuration after Prebuild.
-  assert.match(signingPlugin, /EAS_BUILD/);
+  // The guard covers assembleRelease and bundleRelease; it must not be skipped
+  // on EAS either. On EAS the post-evaluation check rejects a release that is
+  // still on the debug config or has no keystore.
+  assert.match(signingPlugin, /System\.getenv\("EAS_BUILD"\)/);
+  assert.match(signingPlugin, /if \(!uxcEasBuild\)/);
+  assert.match(signingPlugin, /releaseConfig == debugConfig/);
+  assert.match(signingPlugin, /releaseStoreFile\.exists/);
+  assert.doesNotMatch(signingPlugin, /process\.env\.EAS_BUILD === "true"/);
 });
 
 test("permissions the product does not use are blocked", () => {
