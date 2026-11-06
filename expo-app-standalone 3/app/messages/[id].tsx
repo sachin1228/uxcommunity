@@ -1563,6 +1563,10 @@ export default function DmThreadScreen() {
                 inverted
                 renderScrollComponent={renderChatScrollView}
                 data={rows}
+                // Same Android clipping caveat as the community chat list:
+                // detached cells stay blank after the keyboard hands the
+                // space back until the next scroll.
+                removeClippedSubviews={false}
                 keyExtractor={(row) => row.key}
                 // A cached window paints at once; the anchor runs when the push
                 // transition settles and may move it to the unread divider.

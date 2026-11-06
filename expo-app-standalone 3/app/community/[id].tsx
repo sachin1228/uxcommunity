@@ -1336,6 +1336,12 @@ export default function CommunityChat() {
           inverted
           renderScrollComponent={renderChatScrollView}
           data={rows}
+          // Android's native clipping misjudges the bounds of a scaleY-flipped
+          // list behind the keyboard inset: cells beyond the first screen stay
+          // detached after the viewport grows and only come back on a scroll.
+          // The window is one page of messages, so keeping them attached is
+          // cheaper than a blank interval on every dismiss.
+          removeClippedSubviews={false}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
           initialNumToRender={CHAT_LIST_PERFORMANCE.initialNumToRender}
