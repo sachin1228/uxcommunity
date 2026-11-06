@@ -14,17 +14,19 @@ export const loadCommunityChatReadModel = cache(async (
   const db = createServiceClient();
   const showcaseSupported = await canStoreShowcaseFlag(db);
   const [membershipResult, communityResult] = await Promise.all([
-    db.from("community_members").select("last_read_at")
+    db.from("community_members")
+      .select("last_read_at, role, notifications_muted, notifications_muted_until")
       .eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
     (showcaseSupported
-      ? db.from("communities").select("id, name, type, image_url, reference_id, is_private, enabled_tabs, showcase_enabled")
-      : db.from("communities").select("id, name, type, image_url, reference_id, is_private, enabled_tabs"))
+      ? db.from("communities").select("id, name, type, image_url, reference_id, is_private, enabled_tabs, showcase_enabled, member_count, owner_id")
+      : db.from("communities").select("id, name, type, image_url, reference_id, is_private, enabled_tabs, member_count, owner_id"))
       .eq("id", communityId).eq("is_active", true).maybeSingle(),
   ]);
   if (membershipResult.error) return { ok: false, status: 500, error: "Failed to verify community membership." };
   if (!membershipResult.data) return { ok: false, status: 403, error: "Not a member of this community." };
   const community = communityResult.data;
   if (communityResult.error || !community) return { ok: false, status: 404, error: "Community not found." };
+  const role = community.owner_id === userId ? "owner" : (membershipResult.data.role ?? "member");
   const dp = await resolveCommunityDp({
     type: community.type, reference_id: community.reference_id, image_url: community.image_url ?? null,
   });
@@ -38,8 +40,15 @@ export const loadCommunityChatReadModel = cache(async (
         enabled_tabs: community.enabled_tabs ?? undefined,
         showcase_enabled: "showcase_enabled" in community && typeof community.showcase_enabled === "boolean"
           ? community.showcase_enabled : null,
-        // Kept for the existing client shape; hidden until full details arrive.
-        member_count: 0,
+        // Header facts ride on the same two rows, so opening a room no longer
+        // needs a second full read model just to paint the member count and
+        // the bell's mute state. Grants, About and member previews still wait
+        // for the full details read.
+        member_count: Number(community.member_count ?? 0),
+        owner_id: community.owner_id ?? null,
+        current_user_role: role,
+        notifications_muted: membershipResult.data.notifications_muted ?? false,
+        notifications_muted_until: membershipResult.data.notifications_muted_until ?? null,
         details_loaded: false,
       },
       members: [],

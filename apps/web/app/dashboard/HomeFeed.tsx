@@ -6,7 +6,8 @@ import { FeedLoadMore } from "@/components/feeds/FeedLoadMore";
 import { CommunityPreviewModal } from "@/components/communities/CommunityPreviewModal";
 import { FEED_PAGE_SIZE, feedItemKind, type FeedItem } from "@/components/feeds/types";
 import { Spinner } from "@/components/ui/Spinner";
-import { fetchJsonCached, getCachedRequest, initRequestCache, invalidateRequest, patchCachedRequest, setCachedRequest } from "@/lib/request-cache";
+import { DASHBOARD_STALE_MS, fetchJsonCached, getCachedRequest, initRequestCache, invalidateRequest, patchCachedRequest, setCachedRequest } from "@/lib/request-cache";
+import { homeFeedCursorQuery } from "@/lib/feeds/home-feed-cursor";
 import { afterDashboardPaint, markDashboardPaint } from "@/lib/login-performance";
 import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
 import { applyContentChanges } from "@/lib/communities/content-sync";
@@ -57,7 +58,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0, scope, initialItems 
     try {
       const data = await fetchJsonCached<{ items?: FeedItem[] }>(
         feedUrl,
-        { staleMs: 30_000, force },
+        { staleMs: DASHBOARD_STALE_MS.homeFeed, force },
         currentUserId,
       );
       if (!Array.isArray(data?.items)) {
@@ -128,14 +129,14 @@ export function HomeFeed({ currentUserId, refreshToken = 0, scope, initialItems 
     updateItems((current) => applyContentChanges(current, changes, feedItemKind));
   }, [updateItems]));
 
-  // ── Load older posts (keyset pagination via ?before=created_at) ──────────
+  // ── Load older posts (compound keyset via ?before=&before_id=) ───────────
   const loadMore = useCallback(async () => {
     if (loadingMore || !items.length) return;
     const last = items[items.length - 1];
     setLoadingMore(true);
     try {
       const response = await fetch(
-        `${feedUrl}&before=${encodeURIComponent(last.created_at)}`,
+        `${feedUrl}&${homeFeedCursorQuery(last)}`,
       );
       if (!response.ok) return;
       const data = await response.json() as { items?: FeedItem[] };

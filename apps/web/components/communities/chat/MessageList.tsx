@@ -37,6 +37,11 @@ interface MergedGroup {
   items: TimelineItem[];
 }
 
+const OFFSCREEN_GROUP_STYLE = {
+  contentVisibility: "auto",
+  containIntrinsicSize: "auto 160px",
+} as React.CSSProperties;
+
 interface MessageListProps {
   grouped: DateGroup[];
   threadEvents: CachedThreadEvent[];
@@ -303,7 +308,12 @@ export const MessageList = memo(function MessageList({
         const showDateDivider = groupIdx > 0 || !hasMoreAbove;
 
         return (
-          <div key={group.date}>
+          // Long catch-up windows can hold a thousand messages. Off-screen
+          // day groups stay in the DOM (the scroll anchor and reply jumps
+          // address rows by id) but the browser skips their layout, paint and
+          // style work; `auto` remembers the real size after the first render
+          // so the scrollbar does not settle on the estimate.
+          <div key={group.date} style={OFFSCREEN_GROUP_STYLE}>
             {/* The disappearing-messages notice opens the history, above the
                 first date pill — the room's policy line before its timeline.
                 Only once the true start of the history is loaded: while older

@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { avatarBackground, nameInitials } from "@/lib/avatar";
+import { isOptimizableImageUrl } from "@/lib/images/remote-image";
 
 const GENERATED_PROFILE_PICTURE_PATTERNS = [
   /^boring:\/\//i,
@@ -26,6 +28,8 @@ interface AvatarImgProps {
    * frames (e.g. the profile polaroid) that supply their own rounding.
    */
   rounded?: boolean;
+  /** Above-the-fold avatars (profile hero, topbar) load eagerly. */
+  priority?: boolean;
 }
 
 /**
@@ -40,6 +44,7 @@ export function AvatarImg({
   size = 40,
   className,
   rounded = true,
+  priority = false,
 }: AvatarImgProps) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
 
@@ -63,6 +68,33 @@ export function AvatarImg({
     );
   }
 
+  // `aspect-square` is load-bearing, not decoration. Preflight sets
+  // `img { height: auto }`, which overrides the height *attribute*, so a
+  // portrait photo rendered at a fixed width grows taller than it is wide —
+  // and `rounded-full` on a non-square box draws an *ellipse*, not a circle.
+  // aspect-ratio only applies while the height is otherwise auto, so callers
+  // that size themselves (`h-9 w-9`, `h-full w-full`) are unaffected.
+  const imageClassName = `aspect-square ${className ?? ""}`;
+
+  // An avatar is almost always much larger than the box it is painted in.
+  // Asking the optimizer for exactly this width means a 24px sidebar face
+  // downloads a ~48px file instead of the full 400px upload; the variant is
+  // cached at the edge. Unknown hosts keep the plain tag.
+  if (isOptimizableImageUrl(url)) {
+    return (
+      <Image
+        src={url}
+        alt={`${name}'s profile picture`}
+        width={size}
+        height={size}
+        sizes={`${size}px`}
+        priority={priority}
+        className={imageClassName}
+        onError={() => setFailedUrl(url)}
+      />
+    );
+  }
+
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -70,15 +102,10 @@ export function AvatarImg({
       alt={`${name}'s profile picture`}
       width={size}
       height={size}
-      loading="lazy"
+      loading={priority ? "eager" : "lazy"}
+      fetchPriority={priority ? "high" : "auto"}
       decoding="async"
-      // `aspect-square` is load-bearing, not decoration. Preflight sets
-      // `img { height: auto }`, which overrides the height *attribute*, so a
-      // portrait photo rendered at a fixed width grows taller than it is wide —
-      // and `rounded-full` on a non-square box draws an *ellipse*, not a circle.
-      // aspect-ratio only applies while the height is otherwise auto, so callers
-      // that size themselves (`h-9 w-9`, `h-full w-full`) are unaffected.
-      className={`aspect-square ${className ?? ""}`}
+      className={imageClassName}
       onError={() => setFailedUrl(url)}
     />
   );

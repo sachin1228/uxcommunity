@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { CommunityIcon } from "./CommunityIcon";
 import { VerifiedDpBadge } from "./CommunityBadges";
+import { isOptimizableImageUrl } from "@/lib/images/remote-image";
 
 /**
  * Community display picture: a static image (or the fallback icon), wearing
@@ -30,6 +32,8 @@ export interface CommunityDpProps {
   className?: string;
   /** Draws the verified seal over the face's bottom-right corner. */
   verified?: boolean;
+  /** Above-the-fold faces (chat header) load eagerly. */
+  priority?: boolean;
 }
 
 export function CommunityDp({
@@ -39,6 +43,7 @@ export function CommunityDp({
   iconSize,
   className = "bg-surface-raised",
   verified = false,
+  priority = false,
 }: CommunityDpProps) {
   const [imgFailed, setImgFailed] = useState(false);
 
@@ -48,15 +53,29 @@ export function CommunityDp({
         className={`flex h-full w-full items-center justify-center rounded-full overflow-hidden select-none ${className}`}
       >
         {imageUrl && !imgFailed ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={imageUrl}
-            alt={name}
-            className="h-full w-full object-cover"
-            loading="lazy"
-            decoding="async"
-            onError={() => setImgFailed(true)}
-          />
+          isOptimizableImageUrl(imageUrl) ? (
+            <Image
+              src={imageUrl}
+              alt={name}
+              width={size}
+              height={size}
+              sizes={`${size}px`}
+              priority={priority}
+              className="h-full w-full object-cover"
+              onError={() => setImgFailed(true)}
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={imageUrl}
+              alt={name}
+              className="h-full w-full object-cover"
+              loading={priority ? "eager" : "lazy"}
+              fetchPriority={priority ? "high" : "auto"}
+              decoding="async"
+              onError={() => setImgFailed(true)}
+            />
+          )
         ) : (
           <CommunityIcon size={size} iconSize={iconSize} />
         )}

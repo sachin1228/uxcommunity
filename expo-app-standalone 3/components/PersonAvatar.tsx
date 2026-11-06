@@ -39,6 +39,8 @@ export function PersonAvatar({ name, url, size, rounded = true, style }: Props) 
         // kinds; the cast bridges RN's ImageStyle/ViewStyle split.
         style={[frame, style as StyleProp<ImageStyle>]}
         contentFit="cover"
+        cachePolicy="memory-disk"
+        recyclingKey={resolved}
         onError={() => setFailed(true)}
         accessibilityLabel={`${name ?? 'User'} profile picture`}
       />

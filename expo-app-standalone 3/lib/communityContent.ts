@@ -420,6 +420,7 @@ export async function sendEventRsvp(
   communityId: string,
   eventId: string,
   answers?: EventJoinAnswers | null,
+  desired?: 'join' | 'leave',
 ): Promise<RsvpResult> {
   const { data } = await apiFetch<{
     rsvped?: boolean;
@@ -427,7 +428,9 @@ export async function sendEventRsvp(
     chat_community_id?: string | null;
   }>(`/api/communities/${communityId}/events/${eventId}/rsvp`, {
     method: 'POST',
-    body: answers ? { answers } : {},
+    // Stating the intent makes a retry or double-tap idempotent; older
+    // servers ignore the field and keep the toggle contract.
+    body: { ...(answers ? { answers } : {}), ...(desired ? { action: desired } : {}) },
   });
   return {
     value: data.rsvped === true,
@@ -452,7 +455,7 @@ export async function setContentAction(
   }
 
   if (action === 'rsvp') {
-    const result = await sendEventRsvp(communityId, itemId);
+    const result = await sendEventRsvp(communityId, itemId, null, desired ? 'join' : 'leave');
     return { value: result.value, count: result.count };
   }
 

@@ -1,7 +1,8 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { ChevronLeft, Search } from "lucide-react";
+import { virtualWindow } from "@/lib/virtual/virtual-window";
 import { AvatarImg, isGeneratedProfilePicture } from "@/components/ui/AvatarImg";
 import { PhotoViewer } from "@/components/ui/PhotoViewer";
 import { DmIcon } from "@/components/ui/DmIcon";
@@ -15,6 +16,9 @@ import {
 import { messagePreview } from "@/lib/direct-messages/preview-text";
 import { filterConversations } from "@/lib/direct-messages/search";
 import type { DmConversationSummary } from "@/lib/direct-messages/types";
+
+const ROW_HEIGHT = 60;
+const OVERSCAN = 5;
 
 /**
  * The conversation list pane. Rows follow the sidebar's vocabulary: avatar,
@@ -62,6 +66,49 @@ export const DmListPane = memo(function DmListPane({
     (conversation) => !conversation.blocked_by_me && conversation.request_state !== "rejected",
   );
   const visible = filterConversations(all, query);
+
+  // The list can hold up to the server's 200-conversation cap. Rows are a
+  // fixed 60px (one avatar + two truncated lines), so only the visible slice
+  // plus overscan is mounted; spacers preserve the scrollbar and anchor.
+  const listRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const scrollFrameRef = useRef<number | null>(null);
+  const range = virtualWindow(visible.length, ROW_HEIGHT, scrollTop, viewportHeight, OVERSCAN);
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const measure = () => setViewportHeight(el.clientHeight);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: 0 });
+    setScrollTop(0);
+  }, [query]);
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el || !activeId) return;
+    const index = visible.findIndex((conversation) => conversation.id === activeId);
+    if (index < 0) return;
+    const top = index * ROW_HEIGHT;
+    const bottom = top + ROW_HEIGHT;
+    if (top < el.scrollTop) el.scrollTop = top;
+    else if (bottom > el.scrollTop + el.clientHeight) el.scrollTop = bottom - el.clientHeight;
+  }, [activeId, visible]);
+
+  useEffect(
+    () => () => {
+      if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current);
+    },
+    [],
+  );
 
   return (
     <aside className={`flex h-full min-h-0 w-full flex-col border-r border-border bg-background min-[500px]:w-[19rem] min-[500px]:shrink-0 ${className}`}>
@@ -111,7 +158,17 @@ export const DmListPane = memo(function DmListPane({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto py-1">
+      <div
+        ref={listRef}
+        onScroll={() => {
+          if (scrollFrameRef.current !== null) return;
+          scrollFrameRef.current = requestAnimationFrame(() => {
+            scrollFrameRef.current = null;
+            setScrollTop(listRef.current?.scrollTop ?? 0);
+          });
+        }}
+        className="min-h-0 flex-1 overflow-y-auto py-1"
+      >
         {conversations === null && loading ? (
           <div className="flex h-full items-center justify-center" role="status" aria-label="Loading conversations">
             <Spinner size={22} />
@@ -133,7 +190,9 @@ export const DmListPane = memo(function DmListPane({
             </p>
           </div>
         ) : (
-          visible.map((conversation) => {
+          <>
+            <div style={{ height: range.topSpacer }} aria-hidden="true" />
+            {visible.slice(range.start, range.end).map((conversation) => {
             const active = conversation.id === activeId;
             const preview = messagePreview(conversation.last_message, currentUserId);
             const reaction = conversation.last_reaction ?? null;
@@ -149,11 +208,11 @@ export const DmListPane = memo(function DmListPane({
               // px-3/sm:px-4 — the brand's own inset (the topbar logo starts at
               // pl-3, then pl-4 from sm), so avatars, search field and chevron
               // share one left edge.
-              <div key={conversation.id} className="relative">
+              <div key={conversation.id} className="relative" style={{ height: ROW_HEIGHT }}>
                 <button
                   type="button"
                   onClick={() => onSelect(conversation.id)}
-                  className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors sm:px-4 ${
+                  className={`flex h-full w-full items-center gap-3 px-3 py-2.5 text-left transition-colors sm:px-4 ${
                     active ? "bg-surface-raised" : "hover:bg-surface-raised/60"
                   }`}
                   aria-current={active ? "true" : undefined}
@@ -250,7 +309,9 @@ export const DmListPane = memo(function DmListPane({
                 />
               </div>
             );
-          })
+            })}
+            <div style={{ height: range.bottomSpacer }} aria-hidden="true" />
+          </>
         )}
       </div>
 

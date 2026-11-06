@@ -190,6 +190,10 @@ export const ChatHeader = memo(function ChatHeader({
   // state is computed from the deadline, never from the column's presence.
   const muted = isCommunityMuted(community);
   const detailsReady = !!community && community.details_loaded !== false;
+  // The bootstrap header snapshot already knows the caller's mute state, so
+  // the bell works before the deferred details read. Only a missing field
+  // (an older sidebar fallback) still needs that read.
+  const muteReady = !!community && community.notifications_muted !== undefined;
 
   // The second line of the muted dropdown: when the mute lapses, or that it
   // never does. Computed here but rendered only while the dropdown is open
@@ -340,6 +344,7 @@ export const ChatHeader = memo(function ChatHeader({
         size={44}
         iconSize={18}
         className="bg-surface-raised"
+        priority
         verified={communityNameBadges(community.type, community.is_private).verified}
       />
     </DpWithEventDate>
@@ -409,7 +414,7 @@ export const ChatHeader = memo(function ChatHeader({
                     </span>
                   </h3>
                   <div className="mt-0.5 flex items-center gap-2 font-body text-[11px] text-foreground-muted">
-                    {detailsReady && <span className="inline-flex items-center gap-1">
+                    {community.member_count > 0 && <span className="inline-flex items-center gap-1">
                       <Users strokeWidth={2.5} size={10} /> {community.member_count} member
                       {community.member_count !== 1 ? "s" : ""}
                     </span>}
@@ -442,18 +447,18 @@ export const ChatHeader = memo(function ChatHeader({
                 <div className="relative">
                   <button
                     type="button"
-                    aria-label={!detailsReady ? "Load notification settings" : muted ? "Unmute notifications" : "Mute notifications"}
-                    title={!detailsReady ? "Load notification settings" : muted ? "Unmute notifications" : "Mute notifications"}
+                    aria-label={!muteReady ? "Load notification settings" : muted ? "Unmute notifications" : "Mute notifications"}
+                    title={!muteReady ? "Load notification settings" : muted ? "Unmute notifications" : "Mute notifications"}
                     aria-haspopup="menu"
                     aria-expanded={openMenu === "mute"}
                     disabled={muteBusy}
                     onClick={() => {
-                      if (!detailsReady) { void onLoadDetails?.().catch(() => {}); return; }
+                      if (!muteReady) { void onLoadDetails?.().catch(() => {}); return; }
                       setOpenMenu(openMenu === "mute" ? null : "mute");
                     }}
                     className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-50"
                   >
-                    {!detailsReady ? <Spinner size={15} /> : muted ? (
+                    {!muteReady ? <Spinner size={15} /> : muted ? (
                       <BellOff strokeWidth={2.5} size={15} />
                     ) : (
                       <Bell strokeWidth={2.5} size={15} />

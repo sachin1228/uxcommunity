@@ -29,7 +29,7 @@ async function InitialDashboardFeed() {
   const scope = homeFeedScopeFromCookie(store.get(HOME_FEED_SCOPE_COOKIE)?.value);
   let initialItems: FeedItem[] | undefined;
   try {
-    const items = await timer.measure("feed_page_rpc", () => loadHomeFeedPage(userId, null, scope));
+    const items = await timer.measure("feed_page_rpc", () => loadHomeFeedPage(userId, null, null, scope));
     initialItems = items as unknown as FeedItem[];
     timer.finish({ status: 200, returned_rows: items.length });
   } catch {
