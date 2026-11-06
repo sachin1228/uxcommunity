@@ -1,7 +1,7 @@
 {
   "cli": {
     "version": ">= 21.4.0",
-    "appVersionSource": "remote"
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -23,7 +23,6 @@
       }
     },
     "production": {
-      "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://app.uxcommunity.in",
         "EXPO_PUBLIC_APP_ENV": "production",

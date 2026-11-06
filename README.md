@@ -249,12 +249,70 @@ Copy the APK to the device (Drive, chat, USB) and open it there, allowing "insta
   "expo-app-standalone 3/android/app/build/outputs/apk/release/app-release.apk"
 ```
 
+### Release signing
+
+Release builds are **fail-closed**. The mobile app's Android release-signing
+config plugin makes `assembleRelease` / `bundleRelease` read the upload-key credentials and refuse
+to run when one is missing — a release can never silently fall back to the
+debug key. Debug builds keep using the debug keystore and need no credentials.
+
+Set either environment variables:
+
+| Variable | Value |
+|---|---|
+| `UXCOMMUNITY_ANDROID_STORE_FILE` | Path to the upload keystore (absolute, or relative to `android/`) |
+| `UXCOMMUNITY_ANDROID_STORE_PASSWORD` | Keystore password |
+| `UXCOMMUNITY_ANDROID_KEY_ALIAS` | Upload-key alias |
+| `UXCOMMUNITY_ANDROID_KEY_PASSWORD` | Key password |
+
+…or create `android/keystore.properties` with the same values (both are
+gitignored):
+
+```properties
+storeFile=upload-keystore.jks
+storePassword=…
+keyAlias=…
+keyPassword=…
+```
+
+The keystore and passwords must never be committed. For a local test install
+without the upload key, build `./gradlew assembleDebug` instead of a
+debug-signed release. EAS Build manages its own upload credentials, so the
+local guard is skipped when `EAS_BUILD=true`.
+
+Verify a release artifact's certificate before distributing it:
+
+```bash
+"$ANDROID_HOME/build-tools/<version>/apksigner" verify --print-certs \
+  android/app/build/outputs/apk/release/app-release.apk
+```
+
+### Version management
+
+`app.json` is the single source of truth: `expo.version` is `versionName` and
+`expo.android.versionCode` is `versionCode`. `eas.json` uses
+`appVersionSource: "local"`, so local Gradle builds and EAS builds read the
+same values. Bump the version before **every** release, then regenerate the
+native project:
+
+```bash
+cd "expo-app-standalone 3"
+npm run version:check                       # validate the current pair
+npm run version:bump                        # versionCode + 1
+npm run version:bump -- --version 1.1.0     # versionCode + 1 and new versionName
+npx expo prebuild --platform android --no-install
+```
+
+`versionCode` must increase for every released build and must never be reused;
+`versionName` follows `major.minor.patch`. The current public pair is
+`1.0.0` / `1` and is not changed by this repository's tooling until the bump
+command is run.
+
 ### Caveats
 
-- **Signing:** prebuild's default template signs release builds with the debug keystore. Fine for personal/testing installs, but create a real keystore and configure signing before any Play Store release.
 - **Size:** the APK bundles all CPU architectures (~90 MB). Build per-ABI APKs (`ndk.abiFilters` or `./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a`) for a much smaller file.
 - **Env vars:** `EXPO_PUBLIC_*` values (API URL, realtime URL) are baked in at build time from `.env` / `eas.json`, so the APK talks to whatever environment was set when it was built.
-- **Cloud alternative:** `npx eas-cli build -p android --profile preview` builds an APK on Expo's servers (see `eas.json`) and prints a download link.
+- **Cloud alternative:** `npx eas-cli build -p android --profile preview` builds an APK on Expo's servers (see `eas.json`) and prints a download link. Production EAS builds use the local version values above.
 
 ## Environment variables
 
