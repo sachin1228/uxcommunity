@@ -437,6 +437,7 @@ function JobsTabSession({
         <FlatList
           data={visibleJobs}
           keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
           ListHeaderComponent={header}
           ListEmptyComponent={empty}
           contentContainerStyle={{ paddingBottom: insets.bottom + 96 }}

@@ -580,6 +580,7 @@ export default function CommunitiesScreen() {
           data={visible}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 120 }]}
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
