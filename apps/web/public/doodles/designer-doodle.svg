@@ -1,7 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="480" height="480" viewBox="0 0 480 480" fill="none">
-  <!-- uxcommunity chat doodle — designer/UX motifs, stroke line art.
-       Drawn once per icon in <defs>, scattered twice across a seamless 480 tile.
-       Rendered color comes from the CSS layer (mask-image), so strokes stay #000. -->
+  <!-- uxcommunity chat doodle — designer/UX motifs + organic fillers, stroke line art.
+       118 hand-packed placements across a seamless 480 tile in three size tiers
+       (strokes stay ~2px via per-use stroke-width), plus edge-wrap copies so the
+       dense layout never shows a seam. Rendered color comes from the CSS layer
+       (mask-image), so strokes stay #000. -->
   <defs>
     <!-- pen tool nib -->
     <g id="d-pen">
@@ -166,56 +168,201 @@
       <path d="M-13 0 C-7 -9 7 -9 13 0 C7 9 -7 9 -13 0 Z"/>
       <circle cx="0" cy="0" r="3.4"/>
     </g>
+    <!-- squiggle wave -->
+    <g id="d-squiggle">
+      <path d="M-16 1 C-13 -7 -8 -7 -5 0 C-2 7 3 7 6 0 C8 -4 12 -4 15 0"/>
+    </g>
+    <!-- spiral scribble -->
+    <g id="d-spiral">
+      <path d="M0 -13 C7.2 -13 13 -7.2 13 0 C13 7.2 7.2 13 0 13 C-7.2 13 -13 7.2 -13 0 C-13 -5 -9 -8 -5 -7 C-2 -6.3 -1 -4 -2.5 -2.2"/>
+    </g>
+    <!-- dot cluster -->
+    <g id="d-dots">
+      <circle cx="-7" cy="-7" r="1.3"/>
+      <circle cx="0" cy="-7" r="1.3"/>
+      <circle cx="7" cy="-7" r="1.3"/>
+      <circle cx="-7" cy="0" r="1.3"/>
+      <circle cx="0" cy="0" r="1.3"/>
+      <circle cx="7" cy="0" r="1.3"/>
+      <circle cx="-7" cy="7" r="1.3"/>
+      <circle cx="0" cy="7" r="1.3"/>
+      <circle cx="7" cy="7" r="1.3"/>
+    </g>
+    <!-- hatching patch -->
+    <g id="d-hatch">
+      <path d="M-11 -12 L-19 12"/>
+      <path d="M-6 -12 L-14 12"/>
+      <path d="M-1 -12 L-9 12"/>
+      <path d="M4 -12 L-4 12"/>
+      <path d="M9 -12 L1 12"/>
+      <path d="M14 -12 L6 12"/>
+    </g>
+    <!-- idea sprig -->
+    <g id="d-sprig">
+      <path d="M0 13 C1 7 1 0 0 -7"/>
+      <path d="M0 -7 C-6 -10 -10 -14 -11 -19 C-5 -18 -1 -13 0 -7 Z"/>
+      <path d="M0 -1 C6 -2 10 -5 12 -10 C7 -10 2 -6 0 -1 Z"/>
+    </g>
+    <!-- loop scribble -->
+    <g id="d-loops">
+      <path d="M-14 5 C-14 -3 -8 -7 -5 -3 C-2 1 -6 5 -8 2 C-10 -1 -6 -5 -1 -5 C5 -5 8 1 14 4"/>
+    </g>
+    <!-- asterisk -->
+    <g id="d-asterisk">
+      <path d="M0 -10 L0 10"/>
+      <path d="M-8.7 -5 L8.7 5"/>
+      <path d="M-8.7 5 L8.7 -5"/>
+    </g>
+    <!-- plus -->
+    <g id="d-plus">
+      <path d="M0 -8 L0 8"/>
+      <path d="M-8 0 L8 0"/>
+    </g>
+    <!-- paint drop -->
+    <g id="d-drop">
+      <path d="M0 -11 C4 -5 8 0 8 5 C8 10 4 13 0 13 C-4 13 -8 10 -8 5 C-8 0 -4 -5 0 -11 Z"/>
+    </g>
+    <!-- pebble blob -->
+    <g id="d-blob">
+      <path d="M-10 -4 C-11 -9 -6 -12 -1 -11 C4 -10.5 10 -8 11 -3 C12 2 8 8 2 10 C-4 12 -9 7 -10 -4 Z"/>
+    </g>
+    <!-- inspiration bolt -->
+    <g id="d-bolt">
+      <path d="M2 -13 L-6 1 L-1 1 L-3 13 L7 -2 L1 -2 Z"/>
+    </g>
   </defs>
   <g stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none">
-    <use href="#d-pen" xlink:href="#d-pen" transform="translate(34 42) rotate(-8)"/>
-    <use href="#d-bubble" xlink:href="#d-bubble" transform="translate(103 32) rotate(10)"/>
-    <use href="#d-artboard" xlink:href="#d-artboard" transform="translate(171 46) rotate(6)"/>
-    <use href="#d-smiley" xlink:href="#d-smiley" transform="translate(240 34) rotate(-10)"/>
-    <use href="#d-pencil" xlink:href="#d-pencil" transform="translate(309 44) rotate(12)"/>
-    <use href="#d-palette" xlink:href="#d-palette" transform="translate(377 30) rotate(-6)"/>
-    <use href="#d-bulb" xlink:href="#d-bulb" transform="translate(446 48) rotate(8)"/>
-    <use href="#d-bezier" xlink:href="#d-bezier" transform="translate(68 110) rotate(10)"/>
-    <use href="#d-rocket" xlink:href="#d-rocket" transform="translate(137 98) rotate(-12)"/>
-    <use href="#d-gradient" xlink:href="#d-gradient" transform="translate(205 108) rotate(8)"/>
-    <use href="#d-sticky" xlink:href="#d-sticky" transform="translate(274 100) rotate(-6)"/>
-    <use href="#d-eye" xlink:href="#d-eye" transform="translate(343 112) rotate(10)"/>
-    <use href="#d-ruler" xlink:href="#d-ruler" transform="translate(411 102) rotate(-10)"/>
-    <use href="#d-sparkle" xlink:href="#d-sparkle" transform="translate(16 106) rotate(8)"/>
-    <use href="#d-layers" xlink:href="#d-layers" transform="translate(34 180) rotate(-8)"/>
-    <use href="#d-cursor" xlink:href="#d-cursor" transform="translate(103 168) rotate(12)"/>
-    <use href="#d-flow" xlink:href="#d-flow" transform="translate(171 180) rotate(-10)"/>
-    <use href="#d-heart" xlink:href="#d-heart" transform="translate(240 166) rotate(8)"/>
-    <use href="#d-component" xlink:href="#d-component" transform="translate(309 180) rotate(-12)"/>
-    <use href="#d-brush" xlink:href="#d-brush" transform="translate(377 170) rotate(10)"/>
-    <use href="#d-wireframe" xlink:href="#d-wireframe" transform="translate(446 180) rotate(-8)"/>
-    <use href="#d-palette" xlink:href="#d-palette" transform="translate(68 242) rotate(10)"/>
-    <use href="#d-pen" xlink:href="#d-pen" transform="translate(137 250) rotate(-6)"/>
-    <use href="#d-type" xlink:href="#d-type" transform="translate(205 244) rotate(-12)"/>
-    <use href="#d-grid" xlink:href="#d-grid" transform="translate(274 248) rotate(6)"/>
-    <use href="#d-brush" xlink:href="#d-brush" transform="translate(343 240) rotate(10)"/>
-    <use href="#d-sticky" xlink:href="#d-sticky" transform="translate(411 252) rotate(-8)"/>
-    <use href="#d-smiley" xlink:href="#d-smiley" transform="translate(16 244) rotate(-8)"/>
-    <use href="#d-eye" xlink:href="#d-eye" transform="translate(34 308) rotate(-10)"/>
-    <use href="#d-layers" xlink:href="#d-layers" transform="translate(103 316) rotate(8)"/>
-    <use href="#d-bulb" xlink:href="#d-bulb" transform="translate(171 306) rotate(12)"/>
-    <use href="#d-component" xlink:href="#d-component" transform="translate(240 314) rotate(-6)"/>
-    <use href="#d-ruler" xlink:href="#d-ruler" transform="translate(309 308) rotate(10)"/>
-    <use href="#d-artboard" xlink:href="#d-artboard" transform="translate(377 318) rotate(-12)"/>
-    <use href="#d-bubble" xlink:href="#d-bubble" transform="translate(446 306) rotate(8)"/>
-    <use href="#d-pencil" xlink:href="#d-pencil" transform="translate(68 386) rotate(10)"/>
-    <use href="#d-heart" xlink:href="#d-heart" transform="translate(137 378) rotate(-8)"/>
-    <use href="#d-bezier" xlink:href="#d-bezier" transform="translate(205 388) rotate(-12)"/>
-    <use href="#d-cursor" xlink:href="#d-cursor" transform="translate(274 380) rotate(6)"/>
-    <use href="#d-wireframe" xlink:href="#d-wireframe" transform="translate(343 388) rotate(-10)"/>
-    <use href="#d-dropper" xlink:href="#d-dropper" transform="translate(411 380) rotate(-6)"/>
-    <use href="#d-bulb" xlink:href="#d-bulb" transform="translate(16 382) rotate(6)"/>
-    <use href="#d-grid" xlink:href="#d-grid" transform="translate(34 446) rotate(8)"/>
-    <use href="#d-sparkle" xlink:href="#d-sparkle" transform="translate(103 452) rotate(-10)"/>
-    <use href="#d-rocket" xlink:href="#d-rocket" transform="translate(171 446) rotate(12)"/>
-    <use href="#d-pen" xlink:href="#d-pen" transform="translate(240 452) rotate(10)"/>
-    <use href="#d-flow" xlink:href="#d-flow" transform="translate(309 446) rotate(-12)"/>
-    <use href="#d-gradient" xlink:href="#d-gradient" transform="translate(377 452) rotate(8)"/>
-    <use href="#d-type" xlink:href="#d-type" transform="translate(446 446) rotate(-8)"/>
+    <use href="#d-pen" xlink:href="#d-pen" transform="translate(95 413) rotate(-8) scale(1.10)" stroke-width="1.82"/>
+    <use href="#d-bubble" xlink:href="#d-bubble" transform="translate(184 60) rotate(19) scale(0.68)" stroke-width="2.93"/>
+    <use href="#d-loops" xlink:href="#d-loops" transform="translate(251 198) rotate(-11) scale(1.14)" stroke-width="1.76"/>
+    <use href="#d-sprig" xlink:href="#d-sprig" transform="translate(213 280) rotate(-5) scale(1.43)" stroke-width="1.40"/>
+    <use href="#d-type" xlink:href="#d-type" transform="translate(372 265) rotate(-12) scale(1.06)" stroke-width="1.88"/>
+    <use href="#d-cursor" xlink:href="#d-cursor" transform="translate(407 455) rotate(-8) scale(1.01)" stroke-width="1.98"/>
+    <use href="#d-cursor" xlink:href="#d-cursor" transform="translate(166 176) rotate(1) scale(1.14)" stroke-width="1.75"/>
+    <use href="#d-wireframe" xlink:href="#d-wireframe" transform="translate(410 272) rotate(21) scale(1.45)" stroke-width="1.38"/>
+    <use href="#d-drop" xlink:href="#d-drop" transform="translate(400 164) rotate(13) scale(1.70)" stroke-width="1.17"/>
+    <use href="#d-loops" xlink:href="#d-loops" transform="translate(58 188) rotate(14) scale(1.16)" stroke-width="1.72"/>
+    <use href="#d-blob" xlink:href="#d-blob" transform="translate(337 21) rotate(9) scale(1.12)" stroke-width="1.79"/>
+    <use href="#d-hatch" xlink:href="#d-hatch" transform="translate(246 79) rotate(17) scale(1.41)" stroke-width="1.41"/>
+    <use href="#d-eye" xlink:href="#d-eye" transform="translate(267 110) rotate(7) scale(0.86)" stroke-width="2.33"/>
+    <use href="#d-loops" xlink:href="#d-loops" transform="translate(217 439) rotate(-1) scale(1.47)" stroke-width="1.36"/>
+    <use href="#d-layers" xlink:href="#d-layers" transform="translate(87 57) rotate(18) scale(0.98)" stroke-width="2.04"/>
+    <use href="#d-squiggle" xlink:href="#d-squiggle" transform="translate(88 360) rotate(-22) scale(0.77)" stroke-width="2.61"/>
+    <use href="#d-ruler" xlink:href="#d-ruler" transform="translate(425 206) rotate(-13) scale(0.58)" stroke-width="3.47"/>
+    <use href="#d-brush" xlink:href="#d-brush" transform="translate(143 243) rotate(-17) scale(0.75)" stroke-width="2.68"/>
+    <use href="#d-rocket" xlink:href="#d-rocket" transform="translate(114 204) rotate(-18) scale(0.92)" stroke-width="2.17"/>
+    <use href="#d-ruler" xlink:href="#d-ruler" transform="translate(198 378) rotate(21) scale(1.56)" stroke-width="1.29"/>
+    <use href="#d-pen" xlink:href="#d-pen" transform="translate(219 469) rotate(-15) scale(0.61)" stroke-width="3.28"/>
+    <use href="#d-smiley" xlink:href="#d-smiley" transform="translate(247 460) rotate(-6) scale(1.49)" stroke-width="1.35"/>
+    <use href="#d-asterisk" xlink:href="#d-asterisk" transform="translate(215 47) rotate(4) scale(0.76)" stroke-width="2.62"/>
+    <use href="#d-smiley" xlink:href="#d-smiley" transform="translate(314 417) rotate(-21) scale(1.03)" stroke-width="1.94"/>
+    <use href="#d-rocket" xlink:href="#d-rocket" transform="translate(32 235) rotate(-9) scale(0.98)" stroke-width="2.04"/>
+    <use href="#d-plus" xlink:href="#d-plus" transform="translate(465 342) rotate(8) scale(0.87)" stroke-width="2.29"/>
+    <use href="#d-artboard" xlink:href="#d-artboard" transform="translate(67 278) rotate(0) scale(1.43)" stroke-width="1.40"/>
+    <use href="#d-hatch" xlink:href="#d-hatch" transform="translate(395 414) rotate(7) scale(1.62)" stroke-width="1.24"/>
+    <use href="#d-smiley" xlink:href="#d-smiley" transform="translate(281 176) rotate(-14) scale(1.13)" stroke-width="1.77"/>
+    <use href="#d-ruler" xlink:href="#d-ruler" transform="translate(330 350) rotate(-19) scale(0.68)" stroke-width="2.92"/>
+    <use href="#d-bulb" xlink:href="#d-bulb" transform="translate(269 383) rotate(5) scale(1.70)" stroke-width="1.18"/>
+    <use href="#d-bulb" xlink:href="#d-bulb" transform="translate(154 24) rotate(0) scale(1.18)" stroke-width="1.70"/>
+    <use href="#d-smiley" xlink:href="#d-smiley" transform="translate(161 263) rotate(-0) scale(1.20)" stroke-width="1.67"/>
+    <use href="#d-cursor" xlink:href="#d-cursor" transform="translate(314 311) rotate(-7) scale(1.01)" stroke-width="1.99"/>
+    <use href="#d-pen" xlink:href="#d-pen" transform="translate(166 377) rotate(2) scale(0.95)" stroke-width="2.11"/>
+    <use href="#d-dots" xlink:href="#d-dots" transform="translate(348 338) rotate(3) scale(0.56)" stroke-width="3.57"/>
+    <use href="#d-grid" xlink:href="#d-grid" transform="translate(64 323) rotate(-1) scale(1.35)" stroke-width="1.48"/>
+    <use href="#d-component" xlink:href="#d-component" transform="translate(405 362) rotate(-1) scale(1.75)" stroke-width="1.14"/>
+    <use href="#d-wireframe" xlink:href="#d-wireframe" transform="translate(339 230) rotate(7) scale(0.92)" stroke-width="2.17"/>
+    <use href="#d-dropper" xlink:href="#d-dropper" transform="translate(136 466) rotate(-14) scale(1.04)" stroke-width="1.92"/>
+    <use href="#d-bolt" xlink:href="#d-bolt" transform="translate(449 316) rotate(-1) scale(0.75)" stroke-width="2.65"/>
+    <use href="#d-squiggle" xlink:href="#d-squiggle" transform="translate(250 241) rotate(-4) scale(0.98)" stroke-width="2.05"/>
+    <use href="#d-smiley" xlink:href="#d-smiley" transform="translate(207 73) rotate(15) scale(0.63)" stroke-width="3.18"/>
+    <use href="#d-squiggle" xlink:href="#d-squiggle" transform="translate(281 440) rotate(8) scale(1.64)" stroke-width="1.22"/>
+    <use href="#d-pencil" xlink:href="#d-pencil" transform="translate(20 312) rotate(11) scale(1.07)" stroke-width="1.87"/>
+    <use href="#d-sticky" xlink:href="#d-sticky" transform="translate(315 223) rotate(19) scale(0.95)" stroke-width="2.10"/>
+    <use href="#d-flow" xlink:href="#d-flow" transform="translate(466 65) rotate(1) scale(1.59)" stroke-width="1.26"/>
+    <use href="#d-smiley" xlink:href="#d-smiley" transform="translate(213 213) rotate(3) scale(0.71)" stroke-width="2.82"/>
+    <use href="#d-asterisk" xlink:href="#d-asterisk" transform="translate(430 111) rotate(-2) scale(0.60)" stroke-width="3.33"/>
+    <use href="#d-sparkle" xlink:href="#d-sparkle" transform="translate(192 151) rotate(-12) scale(0.73)" stroke-width="2.75"/>
+    <use href="#d-artboard" xlink:href="#d-artboard" transform="translate(396 116) rotate(20) scale(1.37)" stroke-width="1.47"/>
+    <use href="#d-hatch" xlink:href="#d-hatch" transform="translate(76 11) rotate(17) scale(1.62)" stroke-width="1.24"/>
+    <use href="#d-drop" xlink:href="#d-drop" transform="translate(36 397) rotate(10) scale(0.68)" stroke-width="2.94"/>
+    <use href="#d-smiley" xlink:href="#d-smiley" transform="translate(322 116) rotate(-9) scale(0.77)" stroke-width="2.59"/>
+    <use href="#d-smiley" xlink:href="#d-smiley" transform="translate(225 368) rotate(-21) scale(0.72)" stroke-width="2.76"/>
+    <use href="#d-sticky" xlink:href="#d-sticky" transform="translate(54 446) rotate(16) scale(1.04)" stroke-width="1.93"/>
+    <use href="#d-eye" xlink:href="#d-eye" transform="translate(12 13) rotate(15) scale(1.11)" stroke-width="1.80"/>
+    <use href="#d-sticky" xlink:href="#d-sticky" transform="translate(453 118) rotate(-10) scale(0.70)" stroke-width="2.85"/>
+    <use href="#d-eye" xlink:href="#d-eye" transform="translate(290 208) rotate(21) scale(0.71)" stroke-width="2.81"/>
+    <use href="#d-dots" xlink:href="#d-dots" transform="translate(121 157) rotate(-22) scale(1.11)" stroke-width="1.79"/>
+    <use href="#d-plus" xlink:href="#d-plus" transform="translate(127 320) rotate(10) scale(0.99)" stroke-width="2.01"/>
+    <use href="#d-sparkle" xlink:href="#d-sparkle" transform="translate(94 443) rotate(19) scale(0.63)" stroke-width="3.16"/>
+    <use href="#d-drop" xlink:href="#d-drop" transform="translate(444 290) rotate(-9) scale(0.96)" stroke-width="2.08"/>
+    <use href="#d-cursor" xlink:href="#d-cursor" transform="translate(182 211) rotate(1) scale(0.57)" stroke-width="3.53"/>
+    <use href="#d-bolt" xlink:href="#d-bolt" transform="translate(108 451) rotate(9) scale(0.70)" stroke-width="2.84"/>
+    <use href="#d-loops" xlink:href="#d-loops" transform="translate(13 121) rotate(-2) scale(0.99)" stroke-width="2.02"/>
+    <use href="#d-component" xlink:href="#d-component" transform="translate(334 156) rotate(-2) scale(0.67)" stroke-width="2.98"/>
+    <use href="#d-pen" xlink:href="#d-pen" transform="translate(357 382) rotate(-7) scale(1.00)" stroke-width="1.99"/>
+    <use href="#d-bezier" xlink:href="#d-bezier" transform="translate(452 388) rotate(17) scale(1.48)" stroke-width="1.35"/>
+    <use href="#d-smiley" xlink:href="#d-smiley" transform="translate(204 186) rotate(-15) scale(1.00)" stroke-width="1.99"/>
+    <use href="#d-smiley" xlink:href="#d-smiley" transform="translate(280 218) rotate(-16) scale(0.57)" stroke-width="3.49"/>
+    <use href="#d-asterisk" xlink:href="#d-asterisk" transform="translate(293 128) rotate(-11) scale(1.06)" stroke-width="1.90"/>
+    <use href="#d-dropper" xlink:href="#d-dropper" transform="translate(231 119) rotate(-6) scale(1.18)" stroke-width="1.69"/>
+    <use href="#d-type" xlink:href="#d-type" transform="translate(314 98) rotate(-18) scale(0.88)" stroke-width="2.28"/>
+    <use href="#d-asterisk" xlink:href="#d-asterisk" transform="translate(356 11) rotate(-17) scale(0.78)" stroke-width="2.57"/>
+    <use href="#d-artboard" xlink:href="#d-artboard" transform="translate(91 95) rotate(-18) scale(1.17)" stroke-width="1.70"/>
+    <use href="#d-dots" xlink:href="#d-dots" transform="translate(444 260) rotate(-13) scale(0.73)" stroke-width="2.75"/>
+    <use href="#d-eye" xlink:href="#d-eye" transform="translate(391 39) rotate(-15) scale(1.53)" stroke-width="1.31"/>
+    <use href="#d-bolt" xlink:href="#d-bolt" transform="translate(243 303) rotate(-22) scale(0.68)" stroke-width="2.92"/>
+    <use href="#d-drop" xlink:href="#d-drop" transform="translate(111 296) rotate(4) scale(0.77)" stroke-width="2.60"/>
+    <use href="#d-drop" xlink:href="#d-drop" transform="translate(273 301) rotate(8) scale(0.69)" stroke-width="2.89"/>
+    <use href="#d-hatch" xlink:href="#d-hatch" transform="translate(85 153) rotate(4) scale(0.88)" stroke-width="2.28"/>
+    <use href="#d-bubble" xlink:href="#d-bubble" transform="translate(374 451) rotate(-10) scale(0.96)" stroke-width="2.08"/>
+    <use href="#d-bubble" xlink:href="#d-bubble" transform="translate(136 361) rotate(-12) scale(1.68)" stroke-width="1.19"/>
+    <use href="#d-dropper" xlink:href="#d-dropper" transform="translate(335 252) rotate(4) scale(0.67)" stroke-width="2.99"/>
+    <use href="#d-type" xlink:href="#d-type" transform="translate(263 261) rotate(-9) scale(0.70)" stroke-width="2.88"/>
+    <use href="#d-plus" xlink:href="#d-plus" transform="translate(19 70) rotate(-1) scale(0.64)" stroke-width="3.11"/>
+    <use href="#d-wireframe" xlink:href="#d-wireframe" transform="translate(144 78) rotate(-9) scale(0.93)" stroke-width="2.14"/>
+    <use href="#d-plus" xlink:href="#d-plus" transform="translate(274 47) rotate(-5) scale(0.87)" stroke-width="2.29"/>
+    <use href="#d-heart" xlink:href="#d-heart" transform="translate(404 75) rotate(0) scale(0.58)" stroke-width="3.43"/>
+    <use href="#d-palette" xlink:href="#d-palette" transform="translate(401 201) rotate(-3) scale(1.01)" stroke-width="1.98"/>
+    <use href="#d-plus" xlink:href="#d-plus" transform="translate(45 380) rotate(-16) scale(0.98)" stroke-width="2.03"/>
+    <use href="#d-asterisk" xlink:href="#d-asterisk" transform="translate(14 451) rotate(-2) scale(0.94)" stroke-width="2.12"/>
+    <use href="#d-dots" xlink:href="#d-dots" transform="translate(229 22) rotate(-13) scale(0.59)" stroke-width="3.41"/>
+    <use href="#d-cursor" xlink:href="#d-cursor" transform="translate(441 448) rotate(3) scale(1.15)" stroke-width="1.74"/>
+    <use href="#d-squiggle" xlink:href="#d-squiggle" transform="translate(297 273) rotate(-4) scale(1.13)" stroke-width="1.77"/>
+    <use href="#d-gradient" xlink:href="#d-gradient" transform="translate(30 91) rotate(0) scale(1.03)" stroke-width="1.95"/>
+    <use href="#d-component" xlink:href="#d-component" transform="translate(90 384) rotate(-17) scale(0.86)" stroke-width="2.33"/>
+    <use href="#d-type" xlink:href="#d-type" transform="translate(108 242) rotate(-11) scale(0.73)" stroke-width="2.73"/>
+    <use href="#d-sparkle" xlink:href="#d-sparkle" transform="translate(313 11) rotate(-5) scale(1.08)" stroke-width="1.85"/>
+    <use href="#d-smiley" xlink:href="#d-smiley" transform="translate(148 302) rotate(-3) scale(0.64)" stroke-width="3.12"/>
+    <use href="#d-bubble" xlink:href="#d-bubble" transform="translate(350 89) rotate(9) scale(1.03)" stroke-width="1.94"/>
+    <use href="#d-drop" xlink:href="#d-drop" transform="translate(449 173) rotate(7) scale(0.61)" stroke-width="3.29"/>
+    <use href="#d-heart" xlink:href="#d-heart" transform="translate(160 120) rotate(16) scale(0.66)" stroke-width="3.05"/>
+    <use href="#d-heart" xlink:href="#d-heart" transform="translate(141 175) rotate(6) scale(0.77)" stroke-width="2.61"/>
+    <use href="#d-drop" xlink:href="#d-drop" transform="translate(11 235) rotate(-7) scale(0.77)" stroke-width="2.60"/>
+    <use href="#d-loops" xlink:href="#d-loops" transform="translate(312 197) rotate(-6) scale(0.56)" stroke-width="3.55"/>
+    <use href="#d-brush" xlink:href="#d-brush" transform="translate(470 234) rotate(19) scale(1.10)" stroke-width="1.82"/>
+    <use href="#d-component" xlink:href="#d-component" transform="translate(224 328) rotate(-22) scale(1.05)" stroke-width="1.91"/>
+    <use href="#d-bolt" xlink:href="#d-bolt" transform="translate(366 173) rotate(6) scale(0.65)" stroke-width="3.08"/>
+    <use href="#d-dots" xlink:href="#d-dots" transform="translate(26 188) rotate(-10) scale(0.61)" stroke-width="3.26"/>
+    <use href="#d-blob" xlink:href="#d-blob" transform="translate(344 49) rotate(10) scale(1.39)" stroke-width="1.44"/>
+    <use href="#d-bubble" xlink:href="#d-bubble" transform="translate(327 279) rotate(2) scale(0.87)" stroke-width="2.30"/>
+    <use href="#d-wireframe" xlink:href="#d-wireframe" transform="translate(71 232) rotate(-5) scale(1.55)" stroke-width="1.29"/>
+    <use href="#d-asterisk" xlink:href="#d-asterisk" transform="translate(60 110) rotate(-13) scale(1.14)" stroke-width="1.75"/>
+    <use href="#d-wireframe" xlink:href="#d-wireframe" transform="translate(205 106) rotate(-12) scale(0.97)" stroke-width="2.07"/>
+    <use href="#d-smiley" xlink:href="#d-smiley" transform="translate(86 184) rotate(-0) scale(0.60)" stroke-width="3.32"/>
+    <use href="#d-asterisk" xlink:href="#d-asterisk" transform="translate(335 131) rotate(-19) scale(0.59)" stroke-width="3.36"/>
+    <use href="#d-pen" xlink:href="#d-pen" transform="translate(219 -11) rotate(-15) scale(0.61)" stroke-width="3.28"/>
+    <use href="#d-dropper" xlink:href="#d-dropper" transform="translate(136 -14) rotate(-14) scale(1.04)" stroke-width="1.92"/>
+    <use href="#d-pencil" xlink:href="#d-pencil" transform="translate(500 312) rotate(11) scale(1.07)" stroke-width="1.87"/>
+    <use href="#d-flow" xlink:href="#d-flow" transform="translate(-14 65) rotate(1) scale(1.59)" stroke-width="1.26"/>
+    <use href="#d-hatch" xlink:href="#d-hatch" transform="translate(76 491) rotate(17) scale(1.62)" stroke-width="1.24"/>
+    <use href="#d-eye" xlink:href="#d-eye" transform="translate(492 13) rotate(15) scale(1.11)" stroke-width="1.80"/>
+    <use href="#d-eye" xlink:href="#d-eye" transform="translate(12 493) rotate(15) scale(1.11)" stroke-width="1.80"/>
+    <use href="#d-eye" xlink:href="#d-eye" transform="translate(492 493) rotate(15) scale(1.11)" stroke-width="1.80"/>
+    <use href="#d-loops" xlink:href="#d-loops" transform="translate(493 121) rotate(-2) scale(0.99)" stroke-width="2.02"/>
+    <use href="#d-bezier" xlink:href="#d-bezier" transform="translate(-28 388) rotate(17) scale(1.48)" stroke-width="1.35"/>
+    <use href="#d-asterisk" xlink:href="#d-asterisk" transform="translate(356 491) rotate(-17) scale(0.78)" stroke-width="2.57"/>
+    <use href="#d-sparkle" xlink:href="#d-sparkle" transform="translate(313 491) rotate(-5) scale(1.08)" stroke-width="1.85"/>
+    <use href="#d-drop" xlink:href="#d-drop" transform="translate(491 235) rotate(-7) scale(0.77)" stroke-width="2.60"/>
+    <use href="#d-brush" xlink:href="#d-brush" transform="translate(-10 234) rotate(19) scale(1.10)" stroke-width="1.82"/>
   </g>
 </svg>
