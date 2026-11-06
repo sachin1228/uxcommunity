@@ -727,6 +727,7 @@ function ProfileTabSession({
             data={items}
             keyExtractor={feedItemKey}
             renderItem={renderItem}
+            showsVerticalScrollIndicator={false}
             initialNumToRender={FEED_LIST_PERFORMANCE.initialNumToRender}
             maxToRenderPerBatch={FEED_LIST_PERFORMANCE.maxToRenderPerBatch}
             windowSize={FEED_LIST_PERFORMANCE.windowSize}

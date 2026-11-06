@@ -640,6 +640,7 @@ function HomeTabSession({
               data={items}
               keyExtractor={feedItemKey}
               renderItem={renderItem}
+              showsVerticalScrollIndicator={false}
               ListHeaderComponent={scopeSwitcher}
               ListHeaderComponentStyle={styles.listSwitcher}
               initialNumToRender={FEED_LIST_PERFORMANCE.initialNumToRender}
