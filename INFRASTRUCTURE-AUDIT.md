@@ -4,7 +4,7 @@
 > **Revision note (2026-09-26).** First generated 2026-08-31. The structural
 > claims below were re-verified against the current tree and corrected where the
 > code had moved or changed: the realtime worker now runs **two** Durable Object
-> classes (`Room` per community + `UserDO` per user), the **mobile app uses the
+> classes (`Room` per logical room + `UserDO` per user), the **mobile app uses the
 > same Cloudflare realtime path as the web app** (Supabase Realtime is gone), a
 > chat message publishes **one** room event plus an optional Expo push fan-out,
 > notifications are engagement-only and deferred via `after()`, and `lib/` is the
@@ -58,11 +58,11 @@ User (Browser)
   |
   |--- WSS ----> Cloudflare Realtime Worker (rt.uxcommunity.in)
                     |
-                    |--- WebSocket ---> Room DO (per community: chat, threads, events, …)
-                    |--- WebSocket ---> UserDO (per user: notifications, profile)
+                    |--- WebSocket ---> Room DO (one per logical room: chat:<cid>, threads:<cid>, events:<cid>, …)
+                    |--- WebSocket ---> UserDO (one per user: notifications, profile)
                                           |
-                                          |--- SQLite storage (presence / subscriptions)
-                                          |--- Broadcast to subscribed sockets
+                                          |--- In-memory sockets / topic subscriptions / presence count
+                                          |--- SQLite: membership-cache keys and revocation keys (not message storage)
 
 User (Mobile/Expo)
   |
@@ -73,7 +73,7 @@ User (Mobile/Expo)
 ### Deployment Stack
 - **Web**: Cloudflare Workers via OpenNext (`apps/web/wrangler.toml`)
 - **Realtime**: Separate Cloudflare Worker (`apps/realtime/wrangler.toml`, owns the Durable Object classes)
-- **Durable Objects**: `Room` (per community, migration v1) and `UserDO` (per user, migration v2)
+- **Durable Objects**: `Room` (one per logical room name, migration v1) and `UserDO` (per user, migration v2)
 - **CI**: GitHub Actions — `ci.yml` (types + unit tests)
 - **CD**: `.github/workflows/deploy.yml` on push to `main`
 
@@ -323,11 +323,11 @@ active first.
 **Typical concurrent connections**: 2-6 (user socket + one active community's chat/presence/typing + a tab room).
 
 ### Server-Side Presence Tracking
-- **Community rooms**: `apps/realtime/src/room.ts` — storage in Durable Object SQLite (MEMBERS_KEY = "members")
-- **User rooms**: `apps/realtime/src/user.ts` (`UserDO`) — subscriptions only, routed by `room-routing.ts` (`USER_ROOM_PREFIXES = notifications:`, `profile:`)
-- **Mechanism**: `join()` increments `connections` counter, `leave()` decrements. At 0, user removed.
-- **Broadcast**: Full member list sent to all sockets on every join/leave.
-- **Cleanup**: `webSocketClose` and `webSocketError` handlers call `leave(userId)`.
+- **Community rooms**: `apps/realtime/src/room.ts` — in-memory socket registry, topic subscriptions and a distinct-member count. Persisted SQLite keys are the `auth:*` membership cache, not presence.
+- **User rooms**: `apps/realtime/src/user.ts` (`UserDO`) — subscriptions and registered community rooms only; routed by `room-routing.ts` (`USER_ROOM_PREFIXES = notifications:`, `profile:`).
+- **Mechanism**: socket attach/detach updates the distinct-member count; a member stays online until their last socket closes.
+- **Broadcast**: a constant `{t:"presence",room,count}` payload (~78 B), coalesced for 150 ms; rooms larger than 256 sockets rotate through a lap instead of sending a full roster.
+- **Cleanup**: `webSocketClose` / `webSocketError` remove the socket and mark presence dirty; no roster is stored.
 
 ### Reconnection Behavior
 - **Client**: `RealtimeClient` with exponential backoff (1s base, 15s max)
@@ -688,7 +688,7 @@ Logout:
 | **master-data-cache.ts** | Next.js unstable_cache | 1 hour | Per serverless instance | VERY HIGH (rarely changes) |
 | **Cloudflare CDN** | Edge cache | Default | Global | HIGH for static assets |
 | **Cloudflare Workers cache** | ISR | Varies | Per edge location | Medium |
-| **Durable Object SQLite** | Presence/members storage | Persistent | Per room | N/A (state, not cache) |
+| **Durable Object SQLite** | Membership-cache keys (`auth:*`) | 60s TTL, pruned | Per room | N/A (state, not presence) |
 
 ## Data That Should Be Cached But Isn't
 
@@ -712,7 +712,7 @@ Logout:
 
 | DO Class | Binding | File | Instances | Storage | Purpose |
 |---|---|---|---|---|---|
-| `Room` | `COMMUNITY_DO` | `apps/realtime/src/room.ts` | 1 per community (`chat:${cid}`, `threads:${cid}`, … rooms share it) | SQLite | Community WebSocket hub + presence |
+| `Room` | `COMMUNITY_DO` | `apps/realtime/src/room.ts` | 1 per logical room (`chat:${cid}`, `threads:${cid}`, … each resolves to its own instance) | SQLite: membership-cache keys only | Logical-room WebSocket hub + presence |
 | `UserDO` | `USER_DO` | `apps/realtime/src/user.ts` | 1 per user (`user:${userId}`) | SQLite | User-scoped rooms (`notifications:*`, `profile:*`) |
 
 Routing between the two is owned by `apps/realtime/src/room-routing.ts`
@@ -721,7 +721,7 @@ Routing between the two is owned by `apps/realtime/src/room-routing.ts`
 
 ### Room DO Details
 - **WebSocket Hibernation**: Uses `acceptWebSocket()` + `serializeAttachment()` for eviction survival
-- **Storage**: `MEMBERS_KEY = "members"` → JSON object in SQLite with `{userId: {name, avatar, connections}}`
+- **Storage**: in-memory socket registry, topic indexes and presence count; SQLite holds only the persisted `auth:*` membership cache (no message/presence rows)
 - **Message limit**: 8192 bytes per message (MAX_MESSAGE_BYTES)
 - **Fan-out**: the Worker resolves each event through `room-routing.ts` and dispatches publishes with bounded concurrency (`FANOUT_CONCURRENCY = 40`, under the subrequest cap)
 

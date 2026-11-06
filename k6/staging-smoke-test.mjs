@@ -57,7 +57,13 @@ if (!target.ok) {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function createToken(userId) {
-  return new SignJWT({ userId, email: `${userId}@smoke.test`, role: "user" })
+  return new SignJWT({
+    userId,
+    email: `${userId}@smoke.test`,
+    role: "user",
+    sid: `smoke-sid-${userId}`,
+    sv: 1,
+  })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("1h")

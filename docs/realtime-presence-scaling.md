@@ -1,5 +1,14 @@
 # Presence scaling in the Community Room
 
+> **Historical record (preserved, not current capacity guidance).** The staging
+> ladder in this document was measured on build `ed8fae25` and has not been
+> re-run in Stage 5. Its 2,500/4,000/5,000 figures are the source of the old
+> 2,500–4,000 estimate; they are historical observations, not a current safe
+> threshold. Stage 5 could not run authenticated staging tests and verified only
+> 1,000 sockets locally. See
+> [`docs/audits/stage-5-scalability-report.md`](audits/stage-5-scalability-report.md)
+> for the current audit and its staging blocker.
+
 Follow-up to **H-3** (`docs/realtime-5k-loadtest-audit.md`, commit `abebd261`), which
 measured the 5K same-community ladder and found the room-wide presence broadcast to be
 the thing that killed a 2,500-socket room (3.56 GB of presence traffic, DO restarts).

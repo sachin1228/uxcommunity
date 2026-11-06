@@ -1,5 +1,12 @@
 # H-3 — 5K same-community realtime load test
 
+> **Historical record — superseded.** This report measured the pre-presence-fix
+> build: the room-wide roster broadcast was the blocker, and the 500/1,000
+> figures describe that older architecture. It is preserved for history and must
+> not be used as the current capacity limit. The presence fix is recorded in
+> `docs/realtime-presence-scaling.md` (also historical); the current Stage 5
+> audit is [`docs/audits/stage-5-scalability-report.md`](audits/stage-5-scalability-report.md).
+
 > **Verdict up front:** the load test is now correct and it is *not* faked — but
 > **5,000 users in one Community Room did not work** on the staging deployment.
 > The largest verified same-room scale is **1,000 users in a single run**, and the

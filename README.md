@@ -25,7 +25,7 @@ A platform for UI/UX, product, and social media designers. Designers sign up dir
 ## Stack
 
 - **Web app:** Next.js 14 (App Router) + TypeScript + Tailwind CSS
-- **Realtime:** Cloudflare Worker + Durable Objects (`apps/realtime`) — one `Room` DO per community, one `UserDO` per user for notifications/profile rooms
+- **Realtime:** Cloudflare Worker + Durable Objects (`apps/realtime`) — one `Room` DO per logical room (`chat:<id>`, `threads:<id>`, `events:<id>`, …), one `UserDO` per user for notifications/profile rooms
 - **Mobile:** Expo SDK 54 + React Native (`expo-app-standalone 3/`), Expo Router, React Query
 - **Database:** Supabase (PostgreSQL + Row Level Security)
 - **Auth:** Custom JWT sessions (`jose`, `bcryptjs`) — not Supabase Auth
@@ -53,7 +53,7 @@ uxcommunity/
 │   │   │                       realtime/, push/, supabase/, home/, feeds/, r2*/
 │   │   ├── middleware.ts       Session check, route protection, global request rate limit
 │   │   └── wrangler.toml       OpenNext worker config for the Cloudflare deployment
-│   └── realtime/               Cloudflare Worker: Room DO (per community) + UserDO (per user)
+│   └── realtime/               Cloudflare Worker: Room DO (per logical room) + UserDO (per user)
 │       ├── src/                index.ts, room.ts, user.ts, room-routing.ts, subscriptions.ts
 │       └── __tests__/          vitest suites (unit + staging harnesses)
 ├── expo-app-standalone 3/      Mobile app — Expo / React Native + Expo Router

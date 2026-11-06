@@ -80,7 +80,7 @@ New sockets are accepted only after the Worker verifies the JWT and calls
 and account version. Revocation closes matching live sockets with code 4001;
 the web client treats 4001 as terminal and redirects to login.
 
-Community rooms (`chat:*`, `presence:*`, `threads:*`, `events:*`, `resources:*`, `showcase:*`, `rules:*`) are served by one `Room` Durable Object per community; user rooms (`notifications:*`, `profile:*`) share the recipient's `UserDO`. The sidebar keeps at most `SIDEBAR_REALTIME_LIMIT` (15) community chat sockets open, most-recently-active first.
+Each logical community room name (`chat:<id>`, `presence:<id>`, `threads:<id>`, `events:<id>`, `resources:<id>`, `showcase:<id>`, `rules:<id>`) resolves to its **own** `Room` Durable Object; different room types in the same community do not share an instance. User rooms (`notifications:*`, `profile:*`) share the recipient's `UserDO`. The sidebar keeps at most `SIDEBAR_REALTIME_LIMIT` (15) community chat sockets open, most-recently-active first.
 
 ## Push notifications
 

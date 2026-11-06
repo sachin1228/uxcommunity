@@ -284,9 +284,22 @@ function requireEnv() {
   }
 }
 
-/** Sign a per-user session JWT the same way the app's login does. */
+/**
+ * Sign a per-user session JWT the same way the app's login does.
+ *
+ * `sid`/`sv` are required by the current Worker: it validates the registry
+ * session before accepting a community socket, and a token carrying only
+ * `userId` + `role` is rejected with 401. Every client gets its own sid, so a
+ * per-session socket cap is exercised exactly as it is in production.
+ */
 async function createToken(userId) {
-  return new SignJWT({ userId, email: `${userId}@h3loadtest.invalid`, role: "user" })
+  return new SignJWT({
+    userId,
+    email: `${userId}@h3loadtest.invalid`,
+    role: "user",
+    sid: `h3-sid-${userId}`,
+    sv: 1,
+  })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("2h")
@@ -621,14 +634,12 @@ async function preflight() {
     console.error(`\n  FATAL: GET /stats failed (${before.status} ${before.body}).${hint}\n`);
     process.exit(2);
   }
-  const membershipConfigured = (before.stats.metrics?.membershipChecks ?? 0) > 0;
+  const membershipChecksBefore = before.stats.metrics?.membershipChecks ?? 0;
+  const membershipHitsBefore = before.stats.metrics?.membershipCacheHits ?? 0;
   console.log(`  Server /stats:              OK (instanceId=${before.stats.instanceId ?? "?"})`);
   console.log(
     `  Server before:              sockets=${before.stats.sockets} users=${before.stats.users} ` +
       `subscriptionRefs=${before.stats.subscriptionRefs}`,
-  );
-  console.log(
-    `  Membership gate:            ${membershipConfigured ? "configured (internal membership API in use)" : "NOT enforced by this deployment (no API_URL configured) — recorded as a limitation"}`,
   );
 
   const probeUserId = userIdForIndex(0, `${USER_PREFIX}probe`);
@@ -693,6 +704,15 @@ async function preflight() {
   } catch {
     /* already closed */
   }
+
+  const afterProbe = await readServerStats(ROOM);
+  const membershipConfigured =
+    afterProbe.ok &&
+    ((afterProbe.stats.metrics?.membershipChecks ?? 0) > membershipChecksBefore ||
+      (afterProbe.stats.metrics?.membershipCacheHits ?? 0) > membershipHitsBefore);
+  console.log(
+    `  Membership gate:            ${membershipConfigured ? "enforced (the room called the internal membership API during the probe)" : "NOT exercised by this deployment — recorded as a limitation"}`,
+  );
 
   const passed = outcome.hello && outcome.event && !outcome.error;
   console.log(

@@ -39,7 +39,8 @@ interface RevokeRequest {
 }
 
 /**
- * Community Durable Object — ONE per community. Handles all logical realtime
+ * Room Durable Object — ONE per logical room (`chat:<cid>`, `threads:<cid>`,
+ * `events:<cid>`, etc. do not share an instance). Handles that room's realtime
  * topics (chat, typing, presence, threads, events, resources, showcase, rules).
  *
  * Architecture (direct WebSocket ownership):

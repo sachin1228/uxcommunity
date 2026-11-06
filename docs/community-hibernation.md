@@ -13,9 +13,10 @@ socket budget), `performance-audit.md`, `infrastructure-cost-audit.md`.
 
 ## TL;DR
 
-- Each community's realtime runs on **its own WebSocket** straight to that
-  community's Durable Object. The server cannot safely multiplex several
-  communities over one socket (see below).
+- Each community's **chat** runs on **its own WebSocket** straight to that
+  community's `chat:<id>` Room Durable Object. Other logical rooms (`threads:<id>`,
+  `events:<id>`, …) are separate Room DOs. The server cannot safely multiplex
+  several communities over one socket (see below).
 - Clients therefore keep sockets only for the **most recently active window**:
   **10 communities on mobile** (`COMMUNITY_REALTIME_LIMIT`), **15 on web**
   (`SIDEBAR_REALTIME_LIMIT`). Everything else is hibernated.
