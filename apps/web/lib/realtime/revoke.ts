@@ -12,6 +12,8 @@ export interface RealtimeRevocation {
   exceptSid?: string;
   /** Revoke every socket for the user. */
   all?: boolean;
+  /** Revoke only this user's sockets in this community's rooms. */
+  communityId?: string;
 }
 
 function realtimeUrl(): string | null {
@@ -59,6 +61,7 @@ export async function revokeRealtimeSessions(
     ...(revocation.sid ? { sid: revocation.sid } : {}),
     ...(revocation.exceptSid ? { exceptSid: revocation.exceptSid } : {}),
     ...(revocation.all ? { all: true } : {}),
+    ...(revocation.communityId ? { communityId: revocation.communityId } : {}),
   });
 
   for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
@@ -99,6 +102,23 @@ export async function revokeRealtimeSessions(
   logEvent("error", {
     event: "realtime.revoke.exhausted",
     userId: revocation.userId,
+    ...(revocation.communityId ? { community_id: revocation.communityId } : {}),
   });
   return false;
+}
+
+/**
+ * Close a removed member's rooms for one community, without touching their
+ * sessions or their sockets in other communities.
+ *
+ * Called after the membership row is deleted. Best-effort by design (the
+ * caller must not fail the removal if realtime is down), but the retry and
+ * timeout make the normal case immediate. The Room DO is the enforcement
+ * point; this is not a substitute for the handshake membership check.
+ */
+export function revokeRealtimeCommunityMembership(input: {
+  userId: string;
+  communityId: string;
+}): Promise<boolean> {
+  return revokeRealtimeSessions(input);
 }

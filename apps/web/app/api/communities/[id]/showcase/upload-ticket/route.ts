@@ -45,6 +45,27 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const uploadUrl = await presignR2Put(key, type, 600);
     const posterUploadUrl = hasPoster ? await presignR2Put(posterKey, "image/jpeg", 600) : null;
+
+    // The ticket row is the ownership and one-time state the completion route
+    // checks. Without it, a leaked media id/key could be finalized by another
+    // member and a client-reported size could never be compared to the real
+    // object. If we cannot persist the binding, do not issue a usable ticket.
+    const { error: ticketError } = await db.from("media_upload_tickets").insert({
+      media_id: mediaId,
+      user_id: session.userId!,
+      community_id: id,
+      staging_key: key,
+      poster_staging_key: hasPoster ? posterKey : null,
+      content_type: type,
+      expected_size: size,
+      // The presigned URL expires in 10 minutes; the ticket gets a little
+      // longer so a slow upload that just made it can still finalize.
+      expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+    });
+    if (ticketError) {
+      throw new Error(`upload-ticket insert failed: ${ticketError.message}`);
+    }
+
     return NextResponse.json(
       {
         mediaId,

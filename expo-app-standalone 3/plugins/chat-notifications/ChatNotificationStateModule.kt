@@ -90,6 +90,23 @@ class ChatNotificationStateModule(
     private val PENDING_LOCK = Any()
     private var contextRef: WeakReference<ReactApplicationContext>? = null
 
+    /**
+     * The member JS last marked as signed in, or null after sign-out.
+     *
+     * The FCM service runs without JS, so this prefs value is the native
+     * session gate: when it is null, a push that still reaches the device (for
+     * example after a revoked session before the server token deletion settles)
+     * is dropped instead of displaying the previous account's message.
+     */
+    fun currentUserId(context: Context): String? {
+      return try {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+          .getString(USER_KEY, null)
+      } catch (_: Exception) {
+        null
+      }
+    }
+
     fun recordCommunityMessage(context: Context, communityId: String, data: Map<String, String>) {
       val userId: String
       val snapshot = data["chatMessage"]?.takeIf { it.toByteArray(Charsets.UTF_8).size <= 2_000 }

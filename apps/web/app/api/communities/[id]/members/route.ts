@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { cleanupCommunityMedia, collectCommunityMediaUrls } from "@/lib/r2-cleanup";
+import { revokeRealtimeCommunityMembership } from "@/lib/realtime/revoke";
 import { cleanDesignation } from "@/lib/communities/comment-authors";
 import { loadCommunityManagerStatus } from "@/lib/communities/manager-role";
 import { NO_COMMUNITY_PERMISSIONS, type CommunityPermissions } from "@/lib/communities/permissions";
@@ -223,6 +224,8 @@ export async function DELETE(
         console.error("[leave community] R2 cleanup error:", cleanupError);
       }
 
+      await revokeRealtimeCommunityMembership({ userId, communityId });
+
       return NextResponse.json({ success: true, community_deleted: true });
     }
   }
@@ -243,6 +246,10 @@ export async function DELETE(
   if (error) {
     return NextResponse.json({ error: "Failed to leave community." }, { status: 500 });
   }
+
+  // The membership row is gone; close this member's rooms now rather than
+  // waiting for the socket to disconnect or the 60 s membership cache to lapse.
+  await revokeRealtimeCommunityMembership({ userId, communityId });
 
   // 4. For private communities, clean up join request history so user must request again
   if (community.is_private) {

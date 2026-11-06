@@ -1881,6 +1881,66 @@ export type Database = {
         };
         Relationships: [];
       };
+      media_upload_tickets: {
+        Row: {
+          community_id: string;
+          content_type: string;
+          created_at: string;
+          expected_size: number;
+          expires_at: string;
+          finalized_at: string | null;
+          id: string;
+          media_id: string;
+          poster_staging_key: string | null;
+          rejected_at: string | null;
+          staging_key: string;
+          user_id: string;
+        };
+        Insert: {
+          community_id: string;
+          content_type: string;
+          created_at?: string;
+          expected_size: number;
+          expires_at: string;
+          finalized_at?: string | null;
+          id?: string;
+          media_id: string;
+          poster_staging_key?: string | null;
+          rejected_at?: string | null;
+          staging_key: string;
+          user_id: string;
+        };
+        Update: {
+          community_id?: string;
+          content_type?: string;
+          created_at?: string;
+          expected_size?: number;
+          expires_at?: string;
+          finalized_at?: string | null;
+          id?: string;
+          media_id?: string;
+          poster_staging_key?: string | null;
+          rejected_at?: string | null;
+          staging_key?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "media_upload_tickets_community_id_fkey";
+            columns: ["community_id"];
+            isOneToOne: false;
+            referencedRelation: "communities";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "media_upload_tickets_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       member_resumes: {
         Row: {
           created_at: string;

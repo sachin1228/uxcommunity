@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { BadgeCheck, CheckCircle2, ExternalLink, XCircle } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { safeExternalUrl } from "@/lib/security/safe-url";
 
 type Status = "pending" | "approved" | "rejected";
 
@@ -321,15 +322,21 @@ export default function AdminVerificationsPage() {
                             <p className="font-mono text-[10px] uppercase tracking-wider text-foreground-subtle">
                               LinkedIn
                             </p>
-                            <a
-                              href={request.linkedin_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="mt-1 inline-flex items-center gap-1 break-all font-body text-xs text-accent hover:underline"
-                            >
-                              {request.linkedin_url}
-                              <ExternalLink strokeWidth={2.5} size={11} className="shrink-0" />
-                            </a>
+                            {safeExternalUrl(request.linkedin_url) ? (
+                              <a
+                                href={safeExternalUrl(request.linkedin_url)!}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-1 inline-flex items-center gap-1 break-all font-body text-xs text-accent hover:underline"
+                              >
+                                {request.linkedin_url}
+                                <ExternalLink strokeWidth={2.5} size={11} className="shrink-0" />
+                              </a>
+                            ) : (
+                              <p className="mt-1 font-body text-xs text-foreground-muted">
+                                Invalid link
+                              </p>
+                            )}
                           </div>
 
                           <div>
@@ -337,18 +344,25 @@ export default function AdminVerificationsPage() {
                               Portfolio
                             </p>
                             <div className="mt-1 flex flex-col gap-1">
-                              {(request.portfolio_links ?? []).map((link) => (
-                                <a
-                                  key={link}
-                                  href={link}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 break-all font-body text-xs text-accent hover:underline"
-                                >
-                                  {link}
-                                  <ExternalLink strokeWidth={2.5} size={11} className="shrink-0" />
-                                </a>
-                              ))}
+                              {(request.portfolio_links ?? []).map((link) => {
+                                const safe = safeExternalUrl(link);
+                                return safe ? (
+                                  <a
+                                    key={link}
+                                    href={safe}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 break-all font-body text-xs text-accent hover:underline"
+                                  >
+                                    {link}
+                                    <ExternalLink strokeWidth={2.5} size={11} className="shrink-0" />
+                                  </a>
+                                ) : (
+                                  <span key={link} className="font-body text-xs text-foreground-muted">
+                                    Invalid link
+                                  </span>
+                                );
+                              })}
                             </div>
                           </div>
 

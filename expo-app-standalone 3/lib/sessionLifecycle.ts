@@ -83,6 +83,8 @@ export interface SignOutSteps extends MemberStateClearSteps {
   invalidateSession(): void;
   resetRealtime(): void;
   markSignedOut(): void;
+  /** Detach this device's push token before the session cookie is cleared. */
+  unregisterPush?(): Promise<void>;
   clearSession(): Promise<void>;
 }
 
@@ -105,6 +107,12 @@ export function createSignOutCoordinator(steps: SignOutSteps): SignOutCoordinato
         steps.invalidateSession();
         steps.resetRealtime();
         steps.markSignedOut();
+        // Must run before clearSession: the DELETE needs the old cookie, and a
+        // revoked/expired session otherwise keeps its device registered. The
+        // timeout keeps a dead push provider from holding sign-out open.
+        if (steps.unregisterPush) {
+          await settleWithin(steps.unregisterPush(), LOGOUT_STEP_TIMEOUTS.unregisterPush);
+        }
         try {
           await steps.clearSession();
         } catch {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 // @ts-expect-error Node's type-stripping test runner requires an explicit TS extension.
-import { MAX_PROXY_BODY_BYTES, declaredBodyTooLarge, isShowcaseVideoKey, isShowcaseVideoKeyForMedia, proxyUploadKind, readBoundedBody } from "./upload-guard.ts";
+import { MAX_PROXY_BODY_BYTES, declaredBodyTooLarge, evaluateShowcaseVideoFinalize, isShowcaseVideoKey, isShowcaseVideoKeyForMedia, proxyUploadKind, readBoundedBody } from "./upload-guard.ts";
 
 const FIFTY_MB = 50 * 1024 * 1024;
 const CHUNK = 64 * 1024;
@@ -118,4 +118,98 @@ test("object keys are bound to the media id they were issued for", () => {
   assert.equal(isShowcaseVideoKey("media/videos/processed/../../secret.mp4"), false);
   assert.equal(isShowcaseVideoKey("media/videos/processed/not-a-uuid.mp4"), false);
   assert.equal(isShowcaseVideoKey("media/videos/processed/" + mediaId + ".exe"), false);
+});
+
+test("finalize accepts only the ticket owner with a matching HEAD", () => {
+  const mediaId = "3f8a1c2e-4b5d-4e6f-8a9b-0c1d2e3f4a5b";
+  const owner = "aaaaaaaa-1111-4111-8111-111111111111";
+  const community = "bbbbbbbb-2222-4222-8222-222222222222";
+  const key = `media/videos/processed/${mediaId}.mp4`;
+  const ticket = {
+    mediaId,
+    userId: owner,
+    communityId: community,
+    stagingKey: key,
+    posterStagingKey: null,
+    contentType: "video/mp4",
+    expectedSize: 1_000,
+    expiresAt: Date.now() + 60_000,
+    finalizedAt: null,
+    rejectedAt: null,
+  };
+  const body = {
+    ticket,
+    sessionUserId: owner,
+    communityId: community,
+    mediaId,
+    key,
+    type: "video/mp4",
+    reportedSize: 1_000,
+    object: { contentLength: 1_000, contentType: "video/mp4" },
+  };
+
+  const accepted = evaluateShowcaseVideoFinalize(body);
+  assert.equal(accepted.ok, true);
+  if (accepted.ok) {
+    assert.equal(accepted.finalKey, `media/videos/finalized/${mediaId}.mp4`);
+  }
+
+  const unauthorized = evaluateShowcaseVideoFinalize({
+    ...body,
+    sessionUserId: "cccccccc-3333-4333-8333-333333333333",
+  });
+  assert.equal(unauthorized.ok, false);
+  if (!unauthorized.ok) assert.equal(unauthorized.reason, "not_owner");
+
+  const oversized = evaluateShowcaseVideoFinalize({
+    ...body,
+    object: { contentLength: 51 * 1024 * 1024, contentType: "video/mp4" },
+  });
+  assert.equal(oversized.ok, false);
+  if (!oversized.ok) assert.equal(oversized.reason, "object_too_large");
+
+  const actualMismatch = evaluateShowcaseVideoFinalize({
+    ...body,
+    object: { contentLength: 999, contentType: "video/mp4" },
+  });
+  assert.equal(actualMismatch.ok, false);
+  if (!actualMismatch.ok) assert.equal(actualMismatch.reason, "actual_size_mismatch");
+
+  const reportedMismatch = evaluateShowcaseVideoFinalize({
+    ...body,
+    reportedSize: 999,
+  });
+  assert.equal(reportedMismatch.ok, false);
+  if (!reportedMismatch.ok) assert.equal(reportedMismatch.reason, "reported_size_mismatch");
+
+  const missing = evaluateShowcaseVideoFinalize({ ...body, object: null });
+  assert.equal(missing.ok, false);
+  if (!missing.ok) assert.equal(missing.reason, "object_missing");
+
+  const reused = evaluateShowcaseVideoFinalize({
+    ...body,
+    ticket: { ...ticket, finalizedAt: Date.now() },
+  });
+  assert.equal(reused.ok, false);
+  if (!reused.ok) assert.equal(reused.reason, "already_finalized");
+
+  const badType = evaluateShowcaseVideoFinalize({ ...body, type: "video/quicktime" });
+  assert.equal(badType.ok, false);
+  if (!badType.ok) assert.equal(badType.reason, "type_mismatch");
+
+  const spoofedType = evaluateShowcaseVideoFinalize({
+    ...body,
+    object: { contentLength: 1_000, contentType: "text/html" },
+  });
+  assert.equal(spoofedType.ok, false);
+  if (!spoofedType.ok) assert.equal(spoofedType.reason, "object_type_mismatch");
+
+  const expired = evaluateShowcaseVideoFinalize({
+    ...body,
+    now: ticket.expiresAt,
+  });
+  assert.equal(expired.ok, false);
+  if (!expired.ok) assert.equal(expired.reason, "expired");
+
+  assert.equal(evaluateShowcaseVideoFinalize({ ...body, ticket: null }).ok, false);
 });

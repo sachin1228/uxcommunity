@@ -39,7 +39,8 @@ export async function POST(
   const db = createServiceClient();
 
   const [limitResult, access, senderResult] = await Promise.all([
-    rateLimit(`dm:typing:${userId}:10s`, 8, 10),
+    // Ephemeral presence, not a persisted write: availability wins here.
+    rateLimit(`dm:typing:${userId}:10s`, 8, 10, { mode: "availability" }),
     loadDmConversationForUser(db, conversationId, userId),
     db.from("users").select("name").eq("id", userId).maybeSingle(),
   ]);

@@ -21,7 +21,7 @@
  *     different upload.
  */
 
-import { VIDEO_MIME_TYPES } from "@uxcommunity/shared";
+import { MAX_VIDEO_BYTES, VIDEO_MIME_TYPES } from "@uxcommunity/shared";
 
 /**
  * Media the multipart proxy path may serve. Images only — they are compressed
@@ -141,4 +141,143 @@ export function isShowcaseVideoKeyForMedia(key: string, mediaId: string): boolea
   const match = SHOWCASE_VIDEO_KEY_RE.exec(key);
   if (!match) return false;
   return match[1].toLowerCase() === mediaId.trim().toLowerCase();
+}
+
+/** Staging → canonical key. The client can overwrite the staging URL until its
+ *  presign expires, so finalize copies the verified object to a key no client
+ *  has a signed URL for. */
+export function showcaseFinalVideoKeyForMedia(key: string, mediaId: string): string | null {
+  if (!isShowcaseVideoKeyForMedia(key, mediaId)) return null;
+  const extension = key.slice(key.lastIndexOf("."));
+  return `media/videos/finalized/${mediaId.trim().toLowerCase()}${extension}`;
+}
+
+export function isShowcasePosterKeyForMedia(key: string, mediaId: string): boolean {
+  return key === `media/videos/posters/${mediaId.trim().toLowerCase()}.jpg`;
+}
+
+export function showcaseFinalPosterKeyForMedia(mediaId: string): string {
+  return `media/videos/finalized/${mediaId.trim().toLowerCase()}-poster.jpg`;
+}
+
+export interface VideoUploadTicket {
+  mediaId: string;
+  userId: string;
+  communityId: string;
+  stagingKey: string;
+  posterStagingKey: string | null;
+  contentType: string;
+  expectedSize: number;
+  /** Unix ms. */
+  expiresAt: number;
+  /** Unix ms, or null when not finalized. */
+  finalizedAt: number | null;
+  /** Unix ms, or null when not rejected. */
+  rejectedAt: number | null;
+}
+
+export interface R2HeadMetadata {
+  contentLength: number;
+  contentType: string | null;
+}
+
+export type VideoFinalizeRejection =
+  | "ticket_missing"
+  | "not_owner"
+  | "already_finalized"
+  | "rejected"
+  | "expired"
+  | "reference_mismatch"
+  | "type_mismatch"
+  | "size_invalid"
+  | "reported_size_mismatch"
+  | "object_missing"
+  | "object_too_large"
+  | "actual_size_mismatch"
+  | "object_type_mismatch";
+
+export type VideoFinalizeDecision =
+  | { ok: true; finalKey: string }
+  | { ok: false; reason: VideoFinalizeRejection };
+
+export interface VideoFinalizeInput {
+  ticket: VideoUploadTicket | null;
+  sessionUserId: string;
+  communityId: string;
+  mediaId: string;
+  key: string;
+  type: string;
+  reportedSize: number;
+  object: R2HeadMetadata | null;
+  now?: number;
+  maxBytes?: number;
+}
+
+function normalizedContentType(value: string | null): string {
+  return (value ?? "").split(";")[0].trim().toLowerCase();
+}
+
+/**
+ * The finalize decision, pure and exhaustively testable.
+ *
+ * The ticket, not the request body, is authoritative for ownership, expiry,
+ * type and expected size. The R2 HEAD, not the body, is authoritative for the
+ * object's real size and type. A rejection is a permanent failure for that
+ * ticket; the route deletes the staging object so it cannot be finalized later.
+ */
+export function evaluateShowcaseVideoFinalize(
+  input: VideoFinalizeInput,
+): VideoFinalizeDecision {
+  const {
+    ticket,
+    sessionUserId,
+    communityId,
+    mediaId,
+    key,
+    type,
+    reportedSize,
+    object,
+    now = Date.now(),
+    maxBytes = MAX_VIDEO_BYTES,
+  } = input;
+
+  if (!ticket) return { ok: false, reason: "ticket_missing" };
+  if (ticket.userId !== sessionUserId || ticket.communityId !== communityId) {
+    return { ok: false, reason: "not_owner" };
+  }
+  if (ticket.finalizedAt !== null) return { ok: false, reason: "already_finalized" };
+  if (ticket.rejectedAt !== null) return { ok: false, reason: "rejected" };
+  if (ticket.expiresAt <= now) return { ok: false, reason: "expired" };
+  if (
+    ticket.mediaId.toLowerCase() !== mediaId.trim().toLowerCase() ||
+    ticket.stagingKey !== key ||
+    !isShowcaseVideoKeyForMedia(key, mediaId)
+  ) {
+    return { ok: false, reason: "reference_mismatch" };
+  }
+
+  const expectedType = ticket.contentType.toLowerCase();
+  if (!VIDEO_MIME_TYPES.has(type) || type.toLowerCase() !== expectedType) {
+    return { ok: false, reason: "type_mismatch" };
+  }
+  if (!Number.isFinite(reportedSize) || reportedSize <= 0 || reportedSize > maxBytes) {
+    return { ok: false, reason: "size_invalid" };
+  }
+  if (Math.round(reportedSize) !== ticket.expectedSize) {
+    return { ok: false, reason: "reported_size_mismatch" };
+  }
+  if (!object) return { ok: false, reason: "object_missing" };
+  if (object.contentLength <= 0 || object.contentLength > maxBytes) {
+    return { ok: false, reason: "object_too_large" };
+  }
+  if (object.contentLength !== ticket.expectedSize) {
+    return { ok: false, reason: "actual_size_mismatch" };
+  }
+  if (normalizedContentType(object.contentType) !== expectedType) {
+    return { ok: false, reason: "object_type_mismatch" };
+  }
+
+  const finalKey = showcaseFinalVideoKeyForMedia(key, mediaId);
+  if (!finalKey) return { ok: false, reason: "reference_mismatch" };
+  return { ok: true, finalKey };
 }

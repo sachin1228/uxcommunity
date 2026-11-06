@@ -41,7 +41,8 @@ async function checkSustainedLimit(key: string, limit: typeof rateLimit): Promis
   const result = await limit(
     `global-request:sustained:${key}`,
     GLOBAL_REQUEST_LIMITS.sustained.limit,
-    GLOBAL_REQUEST_LIMITS.sustained.windowS
+    GLOBAL_REQUEST_LIMITS.sustained.windowS,
+    { mode: "availability" },
   );
   if (result.success) {
     sustainedVerdicts.set(key, { resetAt: result.resetAt, checkedAt: now });
@@ -106,6 +107,7 @@ export async function checkGlobalRequestRateLimit(
       `global-request:burst:${key}`,
       GLOBAL_REQUEST_LIMITS.burst.limit,
       GLOBAL_REQUEST_LIMITS.burst.windowS,
+      { mode: "availability" },
     )),
     measure("global_sustained", () => checkSustainedLimit(key, limit)),
   ]);

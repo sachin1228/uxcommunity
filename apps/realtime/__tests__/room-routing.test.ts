@@ -17,6 +17,7 @@ import {
   communityIdFromRoomName,
   isUserScopedRoomAllowed,
   resolveRoomTarget,
+  roomBelongsToCommunity,
   USER_ROOM_PREFIXES,
   type RoomRoutingBindings,
 } from "../src/room-routing";
@@ -182,5 +183,25 @@ describe("isUserScopedRoomAllowed", () => {
   it("leaves community-scoped rooms to their own authorization", () => {
     expect(isUserScopedRoomAllowed("chat:community-1", ME)).toBe(true);
     expect(isUserScopedRoomAllowed("thread-comments:thread-1", ME)).toBe(true);
+  });
+
+  it("maps every community room to its community without catching other rooms", () => {
+    const community = "aaaaaaaa-1111-4111-8111-111111111111";
+    for (const room of [
+      `chat:${community}`,
+      `threads:${community}`,
+      `events:${community}`,
+      `resources:${community}`,
+      `rules:${community}`,
+      `showcase:${community}:post-1`,
+    ]) {
+      expect(roomBelongsToCommunity(room, community)).toBe(true);
+    }
+
+    expect(roomBelongsToCommunity(`chat:${community}-suffix`, community)).toBe(false);
+    expect(roomBelongsToCommunity("chat:other", community)).toBe(false);
+    expect(roomBelongsToCommunity(`showcase:other:${community}`, community)).toBe(false);
+    // Comment rooms cannot be mapped from the name; they carry no content.
+    expect(roomBelongsToCommunity("thread-comments:thread-1", community)).toBe(false);
   });
 });

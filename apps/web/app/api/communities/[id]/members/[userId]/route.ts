@@ -12,6 +12,7 @@ import {
   applyCommunityPermissionPatch,
 } from "@/lib/communities/permissions";
 import { cleanDesignation } from "@/lib/communities/comment-authors";
+import { revokeRealtimeCommunityMembership } from "@/lib/realtime/revoke";
 
 /**
  * GET /api/communities/[id]/members/[userId]
@@ -149,6 +150,13 @@ export async function DELETE(
     .eq("user_id", targetUserId);
 
   if (error) return NextResponse.json({ error: "Failed to remove member." }, { status: 500 });
+
+  // A removed member must stop receiving the room immediately; the handshake
+  // check only covers future connections.
+  await revokeRealtimeCommunityMembership({
+    userId: targetUserId,
+    communityId,
+  });
 
   await logCommunityActivity(db, {
     communityId,

@@ -49,7 +49,8 @@ async function renewSessionIfExpiring(session: SessionPayload): Promise<string |
 export async function GET(request: NextRequest) {
   // L-7: Rate-limit /me to prevent aggressive polling from hammering the DB
   const ip = getRequestClientIp(request);
-  const rl = await rateLimit(`me:ip:${ip}`, 60, 60); // 60 per minute per IP
+  // Session restore is a read: a Redis outage must not prevent an app launch.
+  const rl = await rateLimit(`me:ip:${ip}`, 60, 60, { mode: "availability" });
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests." },

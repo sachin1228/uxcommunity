@@ -116,6 +116,12 @@ jobs:
       - name: Run mobile lib tests
         run: npm run test:mobile-cache
 
+      # Blocking. Session teardown, push presentation and the Android backup
+      # policy are security boundaries; each is a React-Native-free module or
+      # a config assertion, so it runs on the runner as-is.
+      - name: Run mobile security tests
+        run: npm run test:mobile-security
+
       # Blocking. Same reason again: the chat content-card helpers live in the
       # mobile app. The card's text is ported from the web byte-for-byte, so
       # drift here is a real cross-client regression.

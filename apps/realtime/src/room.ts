@@ -18,6 +18,14 @@ import { EventIdDedupe } from "./event-dedupe";
 import { MembershipAuthorizer } from "./membership-auth";
 import { PresenceBroadcaster } from "./presence";
 import { communityIdFromRoomName } from "./room-routing";
+import {
+  chooseSocketEvictions,
+  DEFAULT_MAX_SOCKETS_PER_SESSION,
+  DEFAULT_MAX_SOCKETS_PER_USER,
+  DEFAULT_UPGRADE_BURST,
+  DEFAULT_UPGRADE_REFILL_PER_SECOND,
+  readSocketLimit,
+} from "./socket-limits";
 import { encodeEventFrame, helloFrame, readPublishRequest } from "./wire";
 import { secretMatches } from "./session-validation";
 
@@ -26,6 +34,8 @@ interface RevokeRequest {
   sid?: string;
   exceptSid?: string;
   all?: boolean;
+  /** Room-scoped membership removal, counted separately from session logout. */
+  membership?: boolean;
 }
 
 /**
@@ -109,6 +119,37 @@ export class Room extends DurableObject<Env> {
   private userPublishLimit = new PublishRateLimiter<string>(
     USER_PUBLISH_BURST,
     USER_PUBLISH_REFILL_PER_SECOND,
+  );
+
+  /**
+   * Server-enforced connection limits. The client caps are advisory; these are
+   * the boundary. The oldest matching socket is evicted so a reload/reconnect
+   * can replace a stale socket instead of being refused.
+   */
+  private readonly connectionLimits = {
+    perUser: readSocketLimit(
+      this.env.ROOM_MAX_SOCKETS_PER_USER,
+      DEFAULT_MAX_SOCKETS_PER_USER,
+      1,
+      100,
+    ),
+    perSession: readSocketLimit(
+      this.env.ROOM_MAX_SOCKETS_PER_SESSION,
+      DEFAULT_MAX_SOCKETS_PER_SESSION,
+      1,
+      100,
+    ),
+  };
+
+  /** Per-member upgrade bucket; a disconnect/reconnect burst cannot reset it. */
+  private upgradeLimit = new PublishRateLimiter<string>(
+    readSocketLimit(this.env.ROOM_UPGRADE_BURST, DEFAULT_UPGRADE_BURST, 1, 1_000),
+    readSocketLimit(
+      this.env.ROOM_UPGRADE_REFILL_PER_SECOND,
+      DEFAULT_UPGRADE_REFILL_PER_SECOND,
+      1,
+      1_000,
+    ),
   );
 
   readonly metrics = new RealtimeMetrics();
@@ -220,6 +261,16 @@ export class Room extends DurableObject<Env> {
 
     await this.ensureSubscribers();
 
+    // Per-member upgrade budget. This is per Room DO (one community), so a
+    // multi-community member has one bucket per room; the per-user/per-session
+    // socket caps below are the hard limit on what a flood can retain.
+    if (!this.upgradeLimit.allow(userId)) {
+      this.metrics.upgradeRateLimited += 1;
+      return new Response("Too Many Requests", { status: 429 });
+    }
+
+    this.enforceConnectionLimits(userId, sid);
+
     const pair = new WebSocketPair();
     const client = pair[0];
     const server = pair[1];
@@ -319,9 +370,46 @@ export class Room extends DurableObject<Env> {
    * `close` is used for send failures: a socket that cannot be written to must
    * not stay in the fan-out index, otherwise every subsequent event retries it.
    */
+  private socketSid(ws: WebSocket): string {
+    try {
+      const attachment = ws.deserializeAttachment() as WebSocketAttachment | undefined;
+      return attachment?.sid ?? "";
+    } catch {
+      return "";
+    }
+  }
+
+  /**
+   * Evict this member's oldest sockets until one more fits both the per-user
+   * and per-session caps. Runs before the new socket is tracked, so the count
+   * seen here is exactly the sockets that will remain plus this one.
+   */
+  private enforceConnectionLimits(userId: string, sid: string): void {
+    const existing = [...(this.sockets.socketsByUser.get(userId) ?? [])];
+    if (existing.length === 0) return;
+
+    const evictions = chooseSocketEvictions(
+      existing.map((ws) => ({ sid: this.socketSid(ws) })),
+      sid,
+      this.connectionLimits,
+    );
+    for (const index of evictions) {
+      const ws = existing[index];
+      if (!ws) continue;
+      this.metrics.connectionsEvictedLimit += 1;
+      this.removeSocket(ws, "connection-limit");
+    }
+  }
+
   private removeSocket(
     ws: WebSocket,
-    reason: "close" | "error" | "send-failed" | "session-revoked",
+    reason:
+      | "close"
+      | "error"
+      | "send-failed"
+      | "session-revoked"
+      | "membership-revoked"
+      | "connection-limit",
   ): void {
     const userId = this.sockets.userId(ws);
     if (userId === undefined && !this.subscriptions.socketTopics(ws)) return;
@@ -336,7 +424,10 @@ export class Room extends DurableObject<Env> {
     // let a delayed unregister from a closing socket delete the registration a
     // newer socket had just written.
     if (userId !== undefined) {
-      if (lastSocketForUser) this.userPublishLimit.release(userId);
+      if (lastSocketForUser) {
+        this.userPublishLimit.release(userId);
+        this.upgradeLimit.release(userId);
+      }
       this.ctx.waitUntil(this.unregisterRoom(userId));
     }
 
@@ -351,6 +442,18 @@ export class Room extends DurableObject<Env> {
     } else if (reason === "session-revoked") {
       try {
         ws.close(4001, "session revoked");
+      } catch {
+        // Already closing/closed — nothing to do.
+      }
+    } else if (reason === "membership-revoked") {
+      try {
+        ws.close(4003, "membership revoked");
+      } catch {
+        // Already closing/closed — nothing to do.
+      }
+    } else if (reason === "connection-limit") {
+      try {
+        ws.close(4008, "connection limit");
       } catch {
         // Already closing/closed — nothing to do.
       }
@@ -401,14 +504,19 @@ export class Room extends DurableObject<Env> {
               : false;
 
         if (!matches) continue;
-        this.removeSocket(ws, "session-revoked");
+        this.removeSocket(ws, body.membership ? "membership-revoked" : "session-revoked");
         closed += 1;
       }
     }
 
     if (closed > 0) {
-      this.metrics.sessionRevocations += 1;
-      this.metrics.socketsClosedByRevocation += closed;
+      if (body.membership) {
+        this.metrics.membershipRevocations += 1;
+        this.metrics.socketsClosedByMembership += closed;
+      } else {
+        this.metrics.sessionRevocations += 1;
+        this.metrics.socketsClosedByRevocation += closed;
+      }
     }
     return Response.json({ ok: true, closed });
   }

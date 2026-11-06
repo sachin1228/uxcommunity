@@ -1,14 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
-import { uploadToR2, r2ObjectExists, r2PublicUrl } from "@/lib/r2";
+import {
+  copyR2Object,
+  deleteFromR2,
+  headR2Object,
+  r2PublicUrl,
+  uploadToR2,
+  type R2ObjectMetadata,
+} from "@/lib/r2";
 import { extensionForMime } from "@/lib/image-utils";
-import { VIDEO_MIME_TYPES, MAX_VIDEO_BYTES } from "@uxcommunity/shared";
 import {
   declaredBodyTooLarge,
-  isShowcaseVideoKeyForMedia,
+  evaluateShowcaseVideoFinalize,
+  isShowcasePosterKeyForMedia,
   proxyUploadKind,
   readBoundedBody,
+  showcaseFinalPosterKeyForMedia,
+  type VideoUploadTicket,
 } from "@/lib/video/upload-guard";
 import { logEvent } from "@/lib/observability/log";
 
@@ -41,7 +50,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const contentType = request.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) {
-    return completeDirectUpload(request);
+    return completeDirectUpload(request, session.userId!, id);
   }
 
   if (!contentType.includes("multipart/form-data")) {
@@ -131,12 +140,27 @@ interface CompleteBody {
   posterUrl?: unknown;
 }
 
+function finalizeRejectionStatus(reason: string): number {
+  if (reason === "not_owner") return 403;
+  if (reason === "ticket_missing") return 422;
+  if (reason === "already_finalized") return 409;
+  if (reason === "expired") return 410;
+  return 422;
+}
+
 /**
  * VIDEO finalization: the bytes are already in R2 (browser PUT against the
- * presigned ticket), so this only verifies the object landed with a sane shape
- * and returns the attachment. No DB row — the attachment lives on the post.
+ * presigned ticket). The ticket row, not the request body, decides who may
+ * finalize and for how long; the R2 HEAD, not the body, decides the real
+ * size/type. A verified object is copied to a client-unwritable "finalized"
+ * key, so a still-valid staging presign cannot replace the attachment after
+ * finalization.
  */
-async function completeDirectUpload(request: NextRequest) {
+async function completeDirectUpload(
+  request: NextRequest,
+  sessionUserId: string,
+  communityId: string,
+) {
   let body: CompleteBody;
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid completion payload." }, { status: 400 }); }
 
@@ -145,28 +169,46 @@ async function completeDirectUpload(request: NextRequest) {
   const name = typeof body.name === "string" && body.name.trim() ? body.name.trim().slice(0, 255) : "video";
   const type = typeof body.type === "string" ? body.type : "";
   const size = typeof body.size === "number" ? Math.round(body.size) : 0;
-  const posterUrl =
-    typeof body.posterUrl === "string" && /^https:\/\//.test(body.posterUrl) && body.posterUrl.length <= 2048
-      ? body.posterUrl
-      : undefined;
-
-  // Ownership binding: the key must be one this app issues AND must have been
-  // issued for exactly the media id being finalized — no arbitrary keys, and
-  // no finalizing a key that belongs to another upload.
-  if (!mediaId || !isShowcaseVideoKeyForMedia(key, mediaId)) {
+  if (!mediaId || !key) {
     return NextResponse.json({ error: "Invalid upload reference." }, { status: 422 });
   }
-  if (!VIDEO_MIME_TYPES.has(type)) {
-    return NextResponse.json({ error: "Unsupported video type." }, { status: 422 });
-  }
-  if (!(size > 0) || size > MAX_VIDEO_BYTES) {
-    return NextResponse.json({ error: "Videos must be 50 MB or smaller." }, { status: 422 });
+
+  const db = createServiceClient();
+  const { data: row, error: ticketError } = await db
+    .from("media_upload_tickets")
+    .select(
+      "id, media_id, user_id, community_id, staging_key, poster_staging_key, content_type, expected_size, expires_at, finalized_at, rejected_at",
+    )
+    .eq("media_id", mediaId)
+    .maybeSingle();
+
+  if (ticketError) {
+    logEvent("error", {
+      event: "showcase.video_finalize_ticket_read_failed",
+      media_id: mediaId,
+      error: ticketError,
+    });
+    return NextResponse.json({ error: "Could not verify the upload. Try again." }, { status: 500 });
   }
 
+  const ticket: VideoUploadTicket | null = row
+    ? {
+        mediaId: row.media_id,
+        userId: row.user_id,
+        communityId: row.community_id,
+        stagingKey: row.staging_key,
+        posterStagingKey: row.poster_staging_key,
+        contentType: row.content_type,
+        expectedSize: Number(row.expected_size),
+        expiresAt: new Date(row.expires_at).getTime(),
+        finalizedAt: row.finalized_at ? new Date(row.finalized_at).getTime() : null,
+        rejectedAt: row.rejected_at ? new Date(row.rejected_at).getTime() : null,
+      }
+    : null;
+
+  let object: R2ObjectMetadata | null = null;
   try {
-    if (!(await r2ObjectExists(key))) {
-      return NextResponse.json({ error: "Upload did not reach storage. Try again." }, { status: 409 });
-    }
+    object = await headR2Object(key);
   } catch (error) {
     logEvent("error", {
       event: "showcase.video_finalize_head_failed",
@@ -176,16 +218,110 @@ async function completeDirectUpload(request: NextRequest) {
     return NextResponse.json({ error: "Could not verify the upload. Try again." }, { status: 500 });
   }
 
+  const decision = evaluateShowcaseVideoFinalize({
+    ticket,
+    sessionUserId,
+    communityId,
+    mediaId,
+    key,
+    type,
+    reportedSize: size,
+    object,
+  });
+
+  if (!decision.ok) {
+    // Never delete an object that belongs to another member's ticket.
+    const mayClean =
+      decision.reason !== "ticket_missing" &&
+      decision.reason !== "not_owner" &&
+      decision.reason !== "already_finalized";
+    if (mayClean && ticket) {
+      await Promise.allSettled([
+        deleteFromR2(key),
+        ...(ticket.posterStagingKey ? [deleteFromR2(ticket.posterStagingKey)] : []),
+      ]);
+      await db
+        .from("media_upload_tickets")
+        .update({ rejected_at: new Date().toISOString() })
+        .eq("id", row!.id)
+        .is("finalized_at", null);
+    }
+    logEvent("warn", {
+      event: "showcase.video_finalize_rejected",
+      media_id: mediaId,
+      reason: decision.reason,
+    });
+    return NextResponse.json(
+      { error: "Upload verification failed. Please upload the video again." },
+      { status: finalizeRejectionStatus(decision.reason) },
+    );
+  }
+
+  // Copy before claiming: a failed copy leaves the ticket retryable.
+  try {
+    await copyR2Object(key, decision.finalKey, type);
+  } catch (error) {
+    logEvent("error", {
+      event: "showcase.video_finalize_copy_failed",
+      media_id: mediaId,
+      error,
+    });
+    return NextResponse.json({ error: "Could not finish the upload. Try again." }, { status: 500 });
+  }
+
+  let finalPosterUrl: string | undefined;
+  if (ticket?.posterStagingKey) {
+    const posterKey = ticket.posterStagingKey;
+    const posterFinalKey = showcaseFinalPosterKeyForMedia(mediaId);
+    try {
+      const poster = await headR2Object(posterKey);
+      const validPoster =
+        poster !== null &&
+        poster.contentLength > 0 &&
+        poster.contentLength <= MAX_IMAGE_BYTES &&
+        (poster.contentType ?? "").split(";")[0].trim().toLowerCase() === "image/jpeg" &&
+        isShowcasePosterKeyForMedia(posterKey, mediaId);
+      if (validPoster) {
+        await copyR2Object(posterKey, posterFinalKey, "image/jpeg");
+        finalPosterUrl = r2PublicUrl(posterFinalKey);
+      }
+    } catch (error) {
+      // The poster is decorative; a broken poster must not fail the video.
+      logEvent("warn", { event: "showcase.video_finalize_poster_failed", media_id: mediaId, error });
+    }
+    void deleteFromR2(posterKey).catch(() => {});
+  }
+
+  // One winner: a concurrent finalize that read the same unfinalized ticket
+  // loses this conditional update and reports a conflict.
+  const { data: claimed, error: claimError } = await db
+    .from("media_upload_tickets")
+    .update({ finalized_at: new Date().toISOString() })
+    .eq("id", row!.id)
+    .is("finalized_at", null)
+    .select("id");
+
+  if (claimError || !claimed?.length) {
+    // Another finalize won the claim. Do not delete the shared final key: the
+    // winner's (identical, verified) object is now the attachment.
+    return NextResponse.json(
+      { error: "This upload has already been finalized." },
+      { status: 409 },
+    );
+  }
+
+  void deleteFromR2(key).catch(() => {});
+
   return NextResponse.json(
     {
       mediaId,
       status: "ready" as const,
       attachment: {
         name,
-        url: r2PublicUrl(key),
+        url: r2PublicUrl(decision.finalKey),
         type,
-        size,
-        ...(posterUrl ? { poster: posterUrl } : {}),
+        size: object!.contentLength,
+        ...(finalPosterUrl ? { poster: finalPosterUrl } : {}),
         mediaId,
         status: "ready" as const,
       },

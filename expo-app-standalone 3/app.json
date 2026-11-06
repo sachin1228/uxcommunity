@@ -23,6 +23,7 @@
     "android": {
       "backgroundColor": "#09090B",
       "package": "in.uxcommunity.app",
+      "allowBackup": false,
       "softwareKeyboardLayoutMode": "resize",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
@@ -57,7 +58,8 @@
         }
       ],
       "expo-video",
-      "expo-secure-store"
+      "expo-secure-store",
+      "./plugins/withAndroidBackupPolicy"
     ],
     "notification": {
       "color": "#1D1F26"

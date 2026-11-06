@@ -5,6 +5,7 @@ import { requireSession } from "@/lib/auth/session";
 import { deferNotification, eventHref } from "@/lib/notifications";
 import { loadEventForViewer } from "@/lib/communities/event-access";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
+import { revokeRealtimeCommunityMembership } from "@/lib/realtime/revoke";
 import {
   canJoinEventChat,
   ensureEventChatCommunity,
@@ -94,6 +95,7 @@ export async function POST(
       if (chat) {
         leftChatCommunityId = chat.id;
         await leaveEventChat(db, chat.id, userId);
+        await revokeRealtimeCommunityMembership({ userId, communityId: chat.id });
       }
     } catch (error) {
       console.error("[event RSVP] group chat leave failed:", error);

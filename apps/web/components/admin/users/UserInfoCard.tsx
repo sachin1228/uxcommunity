@@ -2,6 +2,7 @@
 
 import { ExternalLink } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
+import { safeExternalUrl } from "@/lib/security/safe-url";
 import type { AdminUser } from "./userTypes";
 import { EXPERIENCE_LABELS, AVATAR_SOURCE_LABELS } from "./userTypes";
 
@@ -21,6 +22,8 @@ interface Props {
 export function UserInfoCard({ user }: Props) {
   const profile = user.designer_profiles;
   const avatarUrl = profile?.avatar_url;
+  const linkedinUrl = safeExternalUrl(profile?.linkedin_url);
+  const portfolioUrl = safeExternalUrl(profile?.portfolio_url);
 
   return (
     <div className="rounded-xl border border-border bg-surface px-6 py-1">
@@ -68,16 +71,18 @@ export function UserInfoCard({ user }: Props) {
       <InfoRow
         label="LinkedIn"
         value={
-          profile?.linkedin_url ? (
+          linkedinUrl ? (
             <a
-              href={profile.linkedin_url}
+              href={linkedinUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 text-accent hover:underline"
             >
-              {profile.linkedin_url}
+              {linkedinUrl}
               <ExternalLink strokeWidth={2.5} size={11} className="shrink-0" />
             </a>
+          ) : profile?.linkedin_url ? (
+            <span className="text-foreground-muted">Invalid link</span>
           ) : (
             "—"
           )
@@ -86,16 +91,18 @@ export function UserInfoCard({ user }: Props) {
       <InfoRow
         label="Portfolio"
         value={
-          profile?.portfolio_url ? (
+          portfolioUrl ? (
             <a
-              href={profile.portfolio_url}
+              href={portfolioUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 text-accent hover:underline"
             >
-              {profile.portfolio_url}
+              {portfolioUrl}
               <ExternalLink strokeWidth={2.5} size={11} className="shrink-0" />
             </a>
+          ) : profile?.portfolio_url ? (
+            <span className="text-foreground-muted">Invalid link</span>
           ) : (
             "—"
           )

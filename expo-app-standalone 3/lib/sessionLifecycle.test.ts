@@ -310,3 +310,36 @@ test('a late logout response cannot clear or rotate a newer login cookie', () =>
     false,
   );
 });
+
+test('an expired-session teardown unregisters push before clearing the cookie', async () => {
+  const rec = recorder();
+  const coordinator = createSignOutCoordinator(
+    memberSteps(rec, {
+      unregisterPush: async () => {
+        rec.calls.push('unregisterPush');
+      },
+    }),
+  );
+
+  assert.equal(await coordinator.signOut(), true);
+  const unregisterAt = rec.calls.indexOf('unregisterPush');
+  const clearAt = rec.calls.indexOf('clearSession');
+  assert.ok(unregisterAt >= 0, 'push must be detached on implicit sign-out');
+  assert.ok(clearAt > unregisterAt, 'the delete needs the session cookie first');
+});
+
+test('a failed push detach cannot block the expired-session teardown', async () => {
+  const rec = recorder();
+  const coordinator = createSignOutCoordinator(
+    memberSteps(rec, {
+      unregisterPush: async () => {
+        rec.calls.push('unregisterPush');
+        throw new Error('network down');
+      },
+    }),
+  );
+
+  assert.equal(await coordinator.signOut(), true);
+  assert.ok(rec.calls.includes('clearSession'));
+  assert.ok(rec.calls.includes('clearCaches'));
+});

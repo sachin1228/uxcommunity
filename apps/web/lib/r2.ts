@@ -318,20 +318,58 @@ export async function r2ObjectExists(key: string): Promise<boolean> {
   }
 }
 
+export interface R2ObjectMetadata {
+  contentLength: number;
+  contentType: string | null;
+  etag: string | null;
+}
+
+/**
+ * Read an object's real metadata (size and content type) from R2.
+ *
+ * A direct-to-R2 upload's client-reported size is never trusted; the finalize
+ * path uses this HEAD so an oversized or type-spoofed object is rejected before
+ * it can become a post attachment. Returns null for a missing object and
+ * rethrows a credential failure (a dead key is not "the object is missing").
+ */
+export async function headR2Object(key: string): Promise<R2ObjectMetadata | null> {
+  const client = getR2Client();
+  try {
+    const response = await sendR2Command(() =>
+      client.send(new HeadObjectCommand({ Bucket: getBucket(), Key: key })),
+    );
+    return {
+      contentLength: Number(response.ContentLength ?? 0),
+      contentType: response.ContentType ?? null,
+      etag: response.ETag ?? null,
+    };
+  } catch (error) {
+    if (error instanceof R2CredentialError) throw error;
+    const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
+    const name = (error as { name?: string }).name;
+    if (status === 404 || name === "NotFound" || name === "NoSuchKey") return null;
+    throw error;
+  }
+}
+
 /**
  * Copies an R2 object to a new key server-side (no bytes through the app).
  * Used by the video pipeline's passthrough fallback: when the FFmpeg engine
  * cannot run, the lossless ORIGINAL becomes the canonical processed object
  * via an in-bucket copy — zero quality loss, no double upload.
  */
-export async function copyR2Object(sourceKey: string, destinationKey: string): Promise<void> {
+export async function copyR2Object(
+  sourceKey: string,
+  destinationKey: string,
+  contentType = "video/mp4",
+): Promise<void> {
   const client = getR2Client();
   await sendR2Command(() =>
     client.send(new CopyObjectCommand({
       Bucket: getBucket(),
       CopySource: `${getBucket()}/${sourceKey}`,
       Key: destinationKey,
-      ContentType: "video/mp4",
+      ContentType: contentType,
       CacheControl: "public, max-age=31536000, immutable",
       MetadataDirective: "REPLACE",
     }))
