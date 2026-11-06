@@ -1096,19 +1096,21 @@ export function CommunityChat({
           <ActivityView communityId={communityId} currentUserId={currentUserId} />
         ) : (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          {/* Message area — paper, watermark and the scroller share one grid
-              cell, so the watermark centers on exactly what the reader sees as
-              the chat. The pane paper stays put while messages scroll (the
-              scroller above it is transparent); the footer below is a plain
-              flex sibling. */}
+          {/* Message area — paper, wallpaper, watermark and the scroller
+              share one grid cell, so the watermark centers on exactly what
+              the reader sees as the chat. The pane paper stays put while
+              messages scroll (the scroller above it is transparent); the
+              footer below is a plain flex sibling. The doodle layer is
+              separate from the paper div because a mask on the paper itself
+              would erase the paper color between the doodles. */}
           <div className="relative grid grid-rows-1 flex-1 min-h-0 overflow-hidden">
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 bg-background"
-            style={{
-              backgroundImage: "radial-gradient(circle,rgba(255,255,255,0.03) 1px,transparent 1px)",
-              backgroundSize: "24px 24px",
-            }}
+          />
+          <div
+            aria-hidden="true"
+            className="chat-doodle-layer pointer-events-none absolute inset-0"
           />
           {isEventRoom && roomHasContent && !eventOver && (
             <ChatWatermark text={displayCommunity?.name ?? ""} />

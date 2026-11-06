@@ -29,6 +29,7 @@ import { ContentReportModal } from '@/components/community/ContentReportModal';
 import { ImageViewer, LightboxImage } from '@/components/chat/ImageViewer';
 import { ChatInput, ChatComposerHandle, PendingImage } from '@/components/chat/ChatInput';
 import { ChatScrollView } from '@/components/chat/ChatScrollView';
+import { ChatDoodleWallpaper } from '@/components/chat/ChatDoodleWallpaper';
 import { EmojiPicker } from '@/components/chat/EmojiPicker';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { MessageActionsSheet } from '@/components/chat/MessageActionsSheet';
@@ -1299,6 +1300,10 @@ export default function CommunityChat() {
 
   const chatContent = (
     <View style={styles.flex}>
+      {/* Designer-doodle wallpaper behind the message area (web
+          CommunityChat `.chat-doodle-layer` parity). The list, empty and
+          loading states all paint transparently over it. */}
+      <ChatDoodleWallpaper />
       {toast && (
         <View style={[styles.toast, { backgroundColor: colors.foreground }]}>
           {toast.icon === 'check' && (

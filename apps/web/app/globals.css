@@ -171,6 +171,9 @@
   /* Modal surfaces — Geist panel ring + drop (light) */
   --modal-ring: rgba(0, 0, 0, 0.05);
   --modal-drop: rgba(0, 0, 0, 0.45);
+
+  /* Community chat wallpaper — ink that shows through the doodle mask. */
+  --chat-doodle-ink: rgba(9, 9, 11, 0.05);
 }
 
 /* ─── Dark mode ─────────────────────────────────────────────────────── */
@@ -344,6 +347,9 @@
     /* Modal surfaces — Geist panel ring + drop (dark) */
     --modal-ring: rgba(255, 255, 255, 0.10);
     --modal-drop: rgba(0, 0, 0, 0.60);
+
+    /* Community chat wallpaper — doodle ink flips to white-on-dark. */
+    --chat-doodle-ink: rgba(255, 255, 255, 0.045);
   }
 }
 
@@ -403,6 +409,9 @@ body {
   --shadow-sm:   0 1px 3px 0 rgb(0 0 0 / 0.50), 0 1px 2px -1px rgb(0 0 0 / 0.40);
   --shadow-md:   0 4px 6px -1px rgb(0 0 0 / 0.60), 0 2px 4px -2px rgb(0 0 0 / 0.48);
   --shadow-card: 0 0 0 1px var(--color-border), 0 2px 8px rgb(0 0 0 / 0.50);
+
+  /* Community chat wallpaper — same white-on-dark ink as the scheme dark. */
+  --chat-doodle-ink: rgba(255, 255, 255, 0.045);
 }
 
 .design-dark * {
@@ -735,6 +744,20 @@ select:focus-visible {
    <textarea> and its emoji mirror layer always share the exact same width. */
 .scrollbar-none { scrollbar-width: none; }
 .scrollbar-none::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+/* ─── Community chat wallpaper ──────────────────────────────────────── */
+/* WhatsApp-style doodle tile behind the community chat messages. The SVG
+   carries plain black strokes; masking keeps the artwork color-free so the
+   ink follows the theme via --chat-doodle-ink (one asset, both schemes). */
+.chat-doodle-layer {
+  background-color: var(--chat-doodle-ink);
+  -webkit-mask-image: url("/doodles/designer-doodle.svg");
+  mask-image: url("/doodles/designer-doodle.svg");
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
+  -webkit-mask-size: 480px 480px;
+  mask-size: 480px 480px;
+}
 
 /* ─── Chat bubble entrance ───────────────────────────────────────────── */
 /* Bubble pops in from its anchored corner, then each word rises into place
