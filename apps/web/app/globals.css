@@ -173,7 +173,6 @@
   --modal-drop: rgba(0, 0, 0, 0.45);
 
   /* Community chat wallpaper — ink that shows through the doodle mask. */
-  --chat-doodle-ink: rgba(9, 9, 11, 0.05);
 }
 
 /* ─── Dark mode ─────────────────────────────────────────────────────── */
@@ -349,8 +348,7 @@
     --modal-drop: rgba(0, 0, 0, 0.60);
 
     /* Community chat wallpaper — doodle ink flips to white-on-dark. */
-    --chat-doodle-ink: rgba(255, 255, 255, 0.045);
-  }
+    }
 }
 
 @tailwind base;
@@ -411,7 +409,6 @@ body {
   --shadow-card: 0 0 0 1px var(--color-border), 0 2px 8px rgb(0 0 0 / 0.50);
 
   /* Community chat wallpaper — same white-on-dark ink as the scheme dark. */
-  --chat-doodle-ink: rgba(255, 255, 255, 0.045);
 }
 
 .design-dark * {
@@ -746,17 +743,15 @@ select:focus-visible {
 .scrollbar-none::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
 /* ─── Community chat wallpaper ──────────────────────────────────────── */
-/* WhatsApp-style doodle tile behind the community chat messages. The SVG
-   carries plain black strokes; masking keeps the artwork color-free so the
-   ink follows the theme via --chat-doodle-ink (one asset, both schemes). */
+/* Supplied designer-community illustration behind the community chat
+   messages — centered, smaller than the pane, faded so it reads as a
+   watermark under the bubbles on both schemes. */
 .chat-doodle-layer {
-  background-color: var(--chat-doodle-ink);
-  -webkit-mask-image: url("/doodles/designer-doodle.svg");
-  mask-image: url("/doodles/designer-doodle.svg");
-  -webkit-mask-repeat: repeat;
-  mask-repeat: repeat;
-  -webkit-mask-size: 480px 480px;
-  mask-size: 480px 480px;
+  background-image: url("/doodles/ux-community-exact.png");
+  background-size: 480px auto;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0.4;
 }
 
 /* ─── Chat bubble entrance ───────────────────────────────────────────── */
