@@ -159,6 +159,13 @@ jobs:
       - name: Run mobile content action tests
         run: npm run test:mobile-content-actions
 
+      # Blocking. The smoke harness is the last gate before a production
+      # deploy, and it imports the same ws/jose stack as the realtime suites.
+      # It needs an installed tree, so it runs here rather than in the
+      # dependency-free deployment audit job.
+      - name: Unit-test the realtime smoke harness
+        run: node --test scripts/smoke-realtime.test.mjs
+
       # Blocking. Push registration decides whether a member's device receives
       # anything at all, and its failure modes are silent: a token echo that
       # re-posts forever, a skipped post that leaves the settings screen on
@@ -305,14 +312,11 @@ jobs:
       - name: Unit-test the FCM credential guard
         run: node --test scripts/verify-fcm-credentials.test.mjs
 
-      # The two guards below gate every production release too. They are
+      # The service credential guard gates every production release too. It is
       # exercised on every PR here, before the deployment workflow calls this
       # suite, so a broken guard cannot be discovered only at release time.
       - name: Unit-test the service credential guard
         run: node --test scripts/verify-service-credentials.test.mjs
-
-      - name: Unit-test the realtime smoke harness
-        run: node --test scripts/smoke-realtime.test.mjs
 
   lint:
     name: ESLint (advisory)

@@ -17,8 +17,9 @@ const {
  *
  *   - keeps the debug build type on the debug keystore;
  *   - signs the release build type from a real keystore, read from
- *     `UXCOMMUNITY_ANDROID_STORE_FILE` / `..._STORE_PASSWORD` /
- *     `..._KEY_ALIAS` / `..._KEY_PASSWORD` or from `android/keystore.properties`;
+ *     `UXCOMMUNITY_ANDROID_STORE_FILE`, `UXCOMMUNITY_ANDROID_STORE_PASSWORD`,
+ *     `UXCOMMUNITY_ANDROID_KEY_ALIAS` and `UXCOMMUNITY_ANDROID_KEY_PASSWORD`,
+ *     or from `android/keystore.properties`;
  *   - throws before any release task runs when those credentials are missing,
  *     so a release build can never silently fall back to the debug key.
  *
