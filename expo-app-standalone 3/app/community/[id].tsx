@@ -5,6 +5,7 @@ import {
   AppState,
   FlatList,
   Image,
+  ImageBackground,
   Pressable,
   ScrollView,
   type ScrollViewProps,
@@ -112,6 +113,10 @@ type ChatRow =
  */
 const JUMP_PILL_THRESHOLD = 80;
 const COMMUNITY_CHAT_COMPOSER_BOTTOM_INSET = 6;
+
+// Chat wallpaper tile (374×666, @2x/@3x beside it) — tinted by the theme at
+// paint time, so one alpha-only asset serves both schemes.
+const CHAT_DOODLE = require('../../assets/images/chat-doodle.png');
 
 export default function CommunityChat() {
   const {
@@ -1298,7 +1303,13 @@ export default function CommunityChat() {
   };
 
   const chatContent = (
-    <View style={styles.flex}>
+    <ImageBackground
+      source={CHAT_DOODLE}
+      resizeMode="repeat"
+      style={styles.flex}
+      // A whisper of the tile: bubbles stay the loudest thing on the screen.
+      imageStyle={{ opacity: colors.isDark ? 0.06 : 0.04, tintColor: colors.foreground }}
+    >
       {toast && (
         <View style={[styles.toast, { backgroundColor: colors.foreground }]}>
           {toast.icon === 'check' && (
@@ -1428,7 +1439,7 @@ export default function CommunityChat() {
         />
       )}
 
-    </View>
+    </ImageBackground>
   );
 
   return (
