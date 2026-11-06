@@ -17,6 +17,7 @@ import {
   ActivityIndicator,
   AppState,
   FlatList,
+  ImageBackground,
   Modal,
   Pressable,
   StyleSheet,
@@ -97,6 +98,10 @@ import { createDmReadCoalescer } from '@/lib/dmReadCoalescer';
 
 const MARK_READ_THROTTLE_MS = 2_000;
 const CATCH_UP_DEBOUNCE_MS = 600;
+
+// Same wallpaper tile as the community chat (374×666, @2x/@3x beside it),
+// tinted by the theme at paint time.
+const CHAT_DOODLE = require('../../assets/images/chat-doodle.png');
 
 interface RealtimeDmPayload {
   id: string;
@@ -1557,7 +1562,13 @@ export default function DmThreadScreen() {
       ) : (
         <>
           <View style={styles.flex}>
-            <View style={styles.flex}>
+            <ImageBackground
+              source={CHAT_DOODLE}
+              resizeMode="repeat"
+              style={styles.flex}
+              // The community chat's wallpaper, same whisper of opacity.
+              imageStyle={{ opacity: colors.isDark ? 0.06 : 0.04, tintColor: colors.foreground }}
+            >
               <FlatList
                 ref={listRef}
                 inverted
@@ -1657,7 +1668,7 @@ export default function DmThreadScreen() {
                 <Feather name="chevron-down" size={16} color={colors.mutedForeground} />
               </Pressable>
             ) : null}
-          </View>
+            </ImageBackground>
 
           {/* Screen-level mount so the panel's native bounds are hit-testable. */}
           <EmojiPicker
