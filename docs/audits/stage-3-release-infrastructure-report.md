@@ -369,7 +369,7 @@ The guard matches any `:app` task whose name contains `Release`, so it covers `a
 | CI discovery | **FIXED** | The tests job now discovers `.test.ts`, `.test.tsx`, `.test.js`, `.test.jsx` and `.test.mjs` outside `e2e/`. |
 | `e2e/community-bootstrap.test.mjs`, `e2e/seed-member.test.mjs` | **PASS** | Pure enough for CI; they run in the `isolation` job. |
 | `e2e/chat-readiness.test.mjs` | **Intentionally excluded** | Launches Playwright/Chromium; the unit runner has no browser install. |
-| `e2e/realtime-sockets.test.mjs` | **Intentionally excluded** | Needs Playwright plus a live app/edge; the realtime suite covers the Worker side. |
+| `e2e/realtime-sockets.test.mjs` | **Intentionally excluded** | Needs Playwright plus a deployed app; the realtime suite covers the Worker side. |
 | `e2e/event-host-going.test.mjs` | **Intentionally excluded** | Needs Supabase plus Playwright and seeded data. |
 | Next.js build | **PASS and blocking** | CI `Web build` job has no `continue-on-error`; the deploy's OpenNext build also fails on type errors. |
 | ESLint | **PARTIAL (advisory)** | 43 pre-existing errors / 25 warnings. It remains advisory; no new lint debt was added, and it was not flipped to blocking. |
