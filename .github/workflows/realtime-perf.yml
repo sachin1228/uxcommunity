@@ -1,0 +1,39 @@
+name: Realtime load tests
+
+# The fan-out/scale suites start their own miniflare Workers and hold hundreds
+# of live WebSockets. They are too slow and memory-hungry for every pull
+# request, so they run here on demand. They never contact production: the
+# Workers, Durable Objects and membership API all run on the runner.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: realtime-perf
+  cancel-in-progress: false
+
+jobs:
+  load:
+    name: Realtime load suites
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      APP_ENV: development
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create the isolated realtime test environment
+        run: cp apps/realtime/__tests__/fixtures/ci.vars apps/realtime/.dev.vars
+
+      - name: Run realtime load tests
+        run: npm run test:perf --workspace=apps/realtime

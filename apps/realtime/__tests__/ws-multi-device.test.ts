@@ -324,12 +324,22 @@ describe("Multi-device: closing one device does not affect the other", () => {
     const device2 = connectCommunityWs(room, token);
     await joinAndSubscribe(device2.ws, device2.messages, userId, room, "chat");
 
-    // Both receive
+    // Both receive. Poll instead of sleeping a fixed second: a loaded runner
+    // can take longer than that to deliver, and the assertion is about
+    // delivery, not about a 1 s deadline.
     await publish(room, "chat", { text: "device-test" });
-    await new Promise((r) => setTimeout(r, 1000));
-
-    const d1 = device1.messages.find((m) => m.t === "event" && m.data?.text === "device-test");
-    const d2 = device2.messages.find((m) => m.t === "event" && m.data?.text === "device-test");
+    const d1 = await waitForMessage(
+      device1.messages,
+      "event",
+      5000,
+      (m) => m.data?.text === "device-test",
+    );
+    const d2 = await waitForMessage(
+      device2.messages,
+      "event",
+      5000,
+      (m) => m.data?.text === "device-test",
+    );
     expect(d1).toBeDefined();
     expect(d2).toBeDefined();
 
@@ -339,10 +349,13 @@ describe("Multi-device: closing one device does not affect the other", () => {
 
     // Device 2 (mobile) must still receive
     await publish(room, "chat", { text: "mobile-only" });
-    await new Promise((r) => setTimeout(r, 1000));
-
+    const d2after = await waitForMessage(
+      device2.messages,
+      "event",
+      5000,
+      (m) => m.data?.text === "mobile-only",
+    );
     const d1after = device1.messages.filter((m) => m.t === "event" && m.data?.text === "mobile-only");
-    const d2after = device2.messages.find((m) => m.t === "event" && m.data?.text === "mobile-only");
     expect(d1after.length).toBe(0);
     expect(d2after).toBeDefined();
 

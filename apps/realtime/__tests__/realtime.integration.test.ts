@@ -977,7 +977,14 @@ describe("Concurrent community delivery", () => {
 // TEST 16: 500 ACTIVE SUBSCRIBERS
 // ============================================================================
 
-describe("500 active subscribers", () => {
+// These three suites hold 500 live sockets and publish up to 50,000 messages.
+// They prove the load path, but they are too heavy for every pull request and
+// make a loaded runner look like a delivery regression. The manual "Realtime
+// load tests" workflow sets REALTIME_LOAD_TESTS=1 and runs this file with the
+// rest of the load suites; the pull-request gate deliberately skips them.
+const loadTests = describe.skipIf(!process.env.REALTIME_LOAD_TESTS);
+
+loadTests("500 active subscribers", () => {
   it("500 clients all receive the same message from one publish", async () => {
     const CLIENT_COUNT = 500;
     const conns: Array<{ ws: WebSocket; messages: any[]; close: () => void }> = [];
@@ -1023,7 +1030,7 @@ describe("500 active subscribers", () => {
 // TEST 16B: DIRECT WEBSOCKET FAN-OUT — 500 × 10
 // ============================================================================
 
-describe("Fan-out: 500 × 10", () => {
+loadTests("Fan-out: 500 × 10", () => {
   it("5000/5000 delivered, 0 duplicates", async () => {
     const N = 500;
     const MESSAGES = 10;
@@ -1075,7 +1082,7 @@ describe("Fan-out: 500 × 10", () => {
 // TEST 16C: DIRECT WEBSOCKET FAN-OUT — 500 × 100
 // ============================================================================
 
-describe("Fan-out: 500 × 100", () => {
+loadTests("Fan-out: 500 × 100", () => {
   it("50000/50000 delivered, 0 duplicates", async () => {
     const N = 500;
     const MESSAGES = 100;

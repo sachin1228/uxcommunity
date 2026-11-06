@@ -14,9 +14,20 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Production deployment calls this workflow directly (see deploy.yml) so the
+  # release gate runs against the exact commit being released. A separate
+  # "latest green run on main" lookup could authorize an older commit.
+  workflow_call:
 
+permissions:
+  contents: read
+
+# Push/PR runs cancel their own superseded run. A workflow_dispatch run (the
+# production deployment calls this workflow, and can also be started by hand)
+# gets a run-specific group so it can never be cancelled by another dispatch —
+# a release must not lose its gate halfway through.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'head' }}
   cancel-in-progress: true
 
 env:
@@ -157,6 +168,82 @@ jobs:
       - name: Run mobile push tests
         run: npm run test:mobile-push
 
+  realtime:
+    name: Realtime correctness
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      # The Worker reads APP_ENV from the isolated .dev.vars fixture; this
+      # process-level value keeps any test helper that reads process.env on the
+      # same local-development path. No production service is contacted.
+      APP_ENV: development
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The suites read .dev.vars (SESSION_SECRET, REALTIME_PUBLISH_SECRET and
+      # the membership API coordinates). The committed fixture holds disposable
+      # CI-only values and nothing from production; the vitest global setup
+      # rewrites API_URL to a local membership stub and restores the file on
+      # teardown. The Workers themselves are miniflare instances in this job —
+      # no Cloudflare account or deployed resource is touched.
+      - name: Create the isolated realtime test environment
+        run: cp apps/realtime/__tests__/fixtures/ci.vars apps/realtime/.dev.vars
+
+      - name: Type check
+        run: npm run typecheck --workspace=apps/realtime
+
+      # Blocking. Covers the WebSocket lifecycle, UserDO/CommunityDO routing,
+      # DO-to-DO RPC delivery, multi-client fan-out, membership authorization,
+      # revocation, reconnect/disconnect behaviour and concurrency. The
+      # socket-heavy load suites are excluded here and run from the manual
+      # "Realtime load tests" workflow instead.
+      - name: Run realtime correctness tests
+        run: npm run test:realtime --workspace=apps/realtime
+
+  web-build:
+    name: Web build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Blocking. `next build` also enforces the type checker (next.config.js
+      # does not ignore build errors) and catches bundling/route problems that
+      # tsc alone cannot. The values are obvious CI dummies: no request leaves
+      # the runner during the build and no production service is contacted.
+      - name: Build the web app
+        working-directory: apps/web
+        env:
+          APP_ENV: production
+          NEXT_PUBLIC_APP_ENV: production
+          NEXT_PUBLIC_APP_URL: https://ci.invalid
+          NEXT_PUBLIC_SUPABASE_URL: https://ci.invalid.supabase.co
+          NEXT_PUBLIC_REALTIME_URL: https://ci.invalid
+          REALTIME_URL: https://ci.invalid
+          R2_PUBLIC_URL: https://ci.invalid
+          SESSION_SECRET: ci-build-session-secret
+          API_SECRET: ci-build-api-secret
+          REALTIME_PUBLISH_SECRET: ci-build-publish-secret
+          SUPABASE_SERVICE_ROLE_KEY: ci-build-service-role-key
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: npm run build
+
   comments:
     name: Comment audit
     runs-on: ubuntu-latest
@@ -217,6 +304,15 @@ jobs:
       # the guard has to be caught here, not while releasing.
       - name: Unit-test the FCM credential guard
         run: node --test scripts/verify-fcm-credentials.test.mjs
+
+      # The two guards below gate every production release too. They are
+      # exercised on every PR here, before the deployment workflow calls this
+      # suite, so a broken guard cannot be discovered only at release time.
+      - name: Unit-test the service credential guard
+        run: node --test scripts/verify-service-credentials.test.mjs
+
+      - name: Unit-test the realtime smoke harness
+        run: node --test scripts/smoke-realtime.test.mjs
 
   lint:
     name: ESLint (advisory)

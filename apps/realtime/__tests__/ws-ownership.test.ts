@@ -546,6 +546,13 @@ describe("WebSocket ownership: no duplicate delivery", () => {
 // TEST 11: SCALE — 100, 500, 1000 CLIENTS
 // ============================================================================
 
+// The 100-client case exercises the normal multi-socket path and stays in the
+// pull-request gate. The 500/1000-client cases hold a thousand sockets on the
+// runner and belong to the manual "Realtime load tests" workflow, which sets
+// REALTIME_LOAD_TESTS=1; running them on every PR makes CI slow and lets
+// runner load masquerade as a delivery regression.
+const loadTests = it.skipIf(!process.env.REALTIME_LOAD_TESTS);
+
 describe("WebSocket ownership: scale tests", () => {
   it("100 clients: all receive, 0 duplicates", async () => {
     const N = 100;
@@ -583,7 +590,7 @@ describe("WebSocket ownership: scale tests", () => {
     for (const conn of conns) conn.close();
   }, 30_000);
 
-  it("500 clients: all receive, 0 duplicates", async () => {
+  loadTests("500 clients: all receive, 0 duplicates", async () => {
     const N = 500;
     const room = "chat:ws_comm_scale500";
     const conns = await connectBatch("ws_s500", N, room, "chat");
@@ -619,7 +626,7 @@ describe("WebSocket ownership: scale tests", () => {
     for (const conn of conns) conn.close();
   }, 60_000);
 
-  it("1000 clients: all receive, 0 duplicates", async () => {
+  loadTests("1000 clients: all receive, 0 duplicates", async () => {
     const N = 1000;
     const room = "chat:ws_comm_scale1k";
     const conns = await connectBatch("ws_s1k", N, room, "chat");

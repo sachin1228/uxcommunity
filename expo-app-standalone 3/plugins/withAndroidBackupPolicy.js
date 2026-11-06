@@ -25,6 +25,10 @@ const BACKUP_RULES = `<?xml version="1.0" encoding="utf-8"?>
   <exclude domain="database" path="." />
   <exclude domain="sharedpref" path="." />
   <exclude domain="external" path="." />
+  <exclude domain="device_root" path="." />
+  <exclude domain="device_file" path="." />
+  <exclude domain="device_database" path="." />
+  <exclude domain="device_sharedpref" path="." />
 </full-backup-content>
 `;
 
@@ -36,6 +40,10 @@ const DATA_EXTRACTION_RULES = `<?xml version="1.0" encoding="utf-8"?>
     <exclude domain="database" path="." />
     <exclude domain="sharedpref" path="." />
     <exclude domain="external" path="." />
+    <exclude domain="device_root" path="." />
+    <exclude domain="device_file" path="." />
+    <exclude domain="device_database" path="." />
+    <exclude domain="device_sharedpref" path="." />
   </cloud-backup>
   <device-transfer>
     <exclude domain="root" path="." />
@@ -43,6 +51,10 @@ const DATA_EXTRACTION_RULES = `<?xml version="1.0" encoding="utf-8"?>
     <exclude domain="database" path="." />
     <exclude domain="sharedpref" path="." />
     <exclude domain="external" path="." />
+    <exclude domain="device_root" path="." />
+    <exclude domain="device_file" path="." />
+    <exclude domain="device_database" path="." />
+    <exclude domain="device_sharedpref" path="." />
   </device-transfer>
 </data-extraction-rules>
 `;

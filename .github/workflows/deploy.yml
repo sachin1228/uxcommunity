@@ -2,10 +2,12 @@ name: Deploy to Cloudflare
 
 # Releases the exact main SHA selected at dispatch through the protected
 # Production environment.
-# Public build settings use dotenv; runtime/build secrets use private JSON files
-# and structured process environment. No main-push deployment. Pending reviewed
-# migrations are applied before the Workers are released; the one-time baseline
-# ledger adoption stays a separate, explicitly approved operation.
+# The reusable `ci` job runs the complete test gate in THIS run, on this exact
+# github.sha, and the deploy job waits for it — a green run from an older
+# commit can never authorize a release. No main-push deployment. Pending
+# reviewed migrations are applied before the Workers are released; the
+# one-time baseline ledger adoption stays a separate, explicitly approved
+# operation.
 on:
   workflow_dispatch:
     inputs:
@@ -13,13 +15,30 @@ on:
         description: 'Type DEPLOY_PRODUCTION to approve this release'
         required: true
 
+permissions:
+  contents: read
+
+# Never cancel a release in flight: the workflow deploys the web Worker, its
+# secrets, the realtime Worker and its secrets in sequence, so a cancel midway
+# can leave production split across two releases. A newer dispatch queues
+# behind this one instead.
 concurrency:
   group: deploy-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  deploy:
+  # The test gate and the release run in the same workflow, on the same
+  # github.sha. A reusable workflow cannot use a successful run from an older
+  # commit: every check below executes against the commit selected at dispatch.
+  # The deploy job cannot start until this job succeeds.
+  ci:
+    name: Required CI
     if: github.ref == 'refs/heads/main' && inputs.confirmation == 'DEPLOY_PRODUCTION'
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: ci
+    if: github.ref == 'refs/heads/main' && inputs.confirmation == 'DEPLOY_PRODUCTION' && needs.ci.result == 'success'
     environment: Production
     runs-on: ubuntu-latest
     env:
@@ -29,6 +48,28 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      # The required CI job ran on this exact SHA. Re-check both facts here:
+      # the checked-out tree is the dispatch SHA, and main has not moved since
+      # (the Production environment approval can sit in the queue for a while).
+      # This rejects a stale queued release instead of publishing older code
+      # under the assumption that it is the current main.
+      - name: Verify the release commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          checked_out=$(git rev-parse HEAD)
+          echo "Dispatch SHA:  $GITHUB_SHA"
+          echo "Checked out:   $checked_out"
+          echo "Required CI:   ${{ needs.ci.result }}"
+          test "$checked_out" = "$GITHUB_SHA"
+          current_main=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [ "$current_main" != "$GITHUB_SHA" ]; then
+            echo "::error::main moved to $current_main after this release was dispatched for $GITHUB_SHA. Re-dispatch the workflow for the new commit."
+            exit 1
+          fi
 
       # wrangler 4.x requires Node >= 22, so use 22 (LTS) even though the
       # app itself builds fine on Node 20.
@@ -88,26 +129,11 @@ jobs:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           FCM_SERVICE_ACCOUNT: ${{ secrets.FCM_SERVICE_ACCOUNT }}
 
-      # A wrong guard here would block a HEALTHY deploy, so its helpers are
-      # pinned down before it is allowed to gate one — same rule as the
-      # realtime smoke harness below.
-      - name: Unit-test the Cloudflare credential guard
-        run: node --test scripts/verify-cloudflare-credentials.test.mjs
-
-      # The other credential that decides whether a deploy is worth making:
-      # same rule as above, its failure branches are pinned down first.
-      - name: Unit-test the R2 media credential guard
-        run: node --test scripts/verify-r2-credentials.test.mjs
-
-      - name: Unit-test the service credential guard
-        run: node --test scripts/verify-service-credentials.test.mjs
-
-      # The FCM key decides whether Android chat notifications can draw the
-      # community DP at all: without it every chat falls back to Expo's generic
-      # layout, which looks like a working push with the avatar missing. Its
-      # failure branches are pinned down before it is allowed to gate a deploy.
-      - name: Unit-test the FCM credential guard
-        run: node --test scripts/verify-fcm-credentials.test.mjs
+      # The credential guards decide whether a deploy proceeds. Their own
+      # failure branches are unit-tested by the required `ci` job above, on
+      # this same SHA, so a broken guard cannot be discovered only at release
+      # time and a healthy release does not have to wait for the same checks
+      # twice.
 
       # Fail in seconds, naming the secret that is wrong, instead of after a
       # full OpenNext build on a symptom from the deepest layer of the stack.
@@ -259,26 +285,10 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
         run: node ../../scripts/environments/production-env.mjs build
 
-      # Blocking: a type error or a failing unit test must stop the deploy.
-      # `next build` already fails on type errors (next.config.js no longer
-      # sets typescript.ignoreBuildErrors), but running tsc first reports the
-      # file/line instead of a bundler stack trace, and catches errors in
-      # files the build tree does not reach.
-      - name: Type check
-        working-directory: apps/web
-        run: npx tsc --noEmit
-
-      - name: Run unit tests
-        working-directory: apps/web
-        env:
-          APP_ENV: production
-        run: |
-          npx tsx --tsconfig tsconfig.json --test lib/read-manager.test.ts
-          npx tsx --test lib/request-cache.test.ts
-          # The browser test's seeder resolves its target BEFORE it writes, so
-          # these are the guards that decide what a shared project is allowed to
-          # receive (e2e/seed-member.mjs). No database, no browser.
-          node --test e2e/seed-member.test.mjs
+      # The required `ci` job above already ran the full web typecheck, unit
+      # suite and mobile suites on this SHA. The OpenNext build below still
+      # fails on type errors (next.config.js does not ignore them), so the
+      # artifact itself cannot be built from a tree that does not compile.
 
       # ── Database ───────────────────────────────────────────────────────────
       # Apply reviewed migrations after every check has passed and before either

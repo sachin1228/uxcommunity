@@ -10,6 +10,8 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "version:check": "node scripts/android-version.mjs check",
+    "version:bump": "node scripts/android-version.mjs bump",
     "doctor:push": "node scripts/push-doctor.mjs",
     "sync:google-services": "node scripts/sync-google-services.mjs"
   },
@@ -32,7 +34,6 @@
     "expo-image-picker": "~17.0.9",
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.10",
-    "expo-location": "~19.0.8",
     "expo-media-library": "~18.2.1",
     "expo-notifications": "~0.32.17",
     "expo-router": "~6.0.17",
