@@ -122,7 +122,7 @@ The Stage 2 prompt's "additional security checks" were inspected. No new verifie
 - The winner HEADs the staging object, copies it to a **claim-specific** final key (`media/videos/finalized/<mediaId>/<claimToken>.<ext>`), and HEADs the copy. The copy must match the staging ETag, size and content type before commit; a concurrent PUT that changes staging between HEAD and copy is rejected. Correctness does not depend on a provider-specific conditional-copy header.
 - The commit RPC requires the winning claim token. A losing/stale claimant can neither commit nor overwrite the winner; it deletes its own claim-scoped key. The final key is never presigned, so a still-valid staging PUT cannot replace the finalized object.
 - A finalized retry returns the committed attachment. If the commit response is lost, the route re-reads the ticket: the stored final key proves whether the commit landed; an ambiguous DB error leaves the claim-scoped object in place rather than deleting a possibly referenced object.
-- Rejected/missing/mismatched staging objects are deleted and the ticket is marked rejected; the route deletes staging only after a successful commit.
+- Rejected/missing/mismatched staging objects are deleted only after a confirmed rejection; the pre-commit poster cleanup was removed. A shared-staging cleanup policy (`finalizeCleanup`) deletes staging only on `committed`, `finalized_ours` or `rejected`; a losing/stale claimant deletes only its own claim-scoped final objects; an ambiguous commit deletes nothing.
 
 ### AUD-08 — push lifecycle
 - Implicit sign-out (401, expiry, realtime 4001, server revocation) detaches the device token before `clearSession`; explicit logout already did.
@@ -155,7 +155,7 @@ The Stage 2 prompt's "additional security checks" were inspected. No new verifie
 - `apps/web/lib/auth/rate-limit.test.ts`: strict missing-config fail-closed; availability missing-config; strict local fallback after a connection failure with limit enforcement; availability availability; development local window; failure classification.
 - `apps/web/lib/auth/rate-limit-route-audit.test.ts`: sensitive prefixes stay strict; availability is allowlisted to two routes; critical routes carry a limiter.
 - `apps/web/lib/security/safe-url.test.ts`: malicious schemes, credentials, control chars, malformed/overlong, bare domains, LinkedIn host rules, PATCH-body parsing.
-- `apps/web/lib/video/upload-guard.test.ts`: valid finalize and every rejection reason (owner, reused, missing, oversized, size mismatch, type mismatch, expired); claim-specific final keys cannot collide; `copiedObjectMatches` rejects a different/absent ETag, size or type; a lost commit response resolves to the stored final key or a retry.
+- `apps/web/lib/video/upload-guard.test.ts`: valid finalize and every rejection reason (owner, reused, missing, oversized, size mismatch, type mismatch, expired); claim-specific final keys cannot collide; `copiedObjectMatches` rejects a different/absent ETag, size or type; a lost commit response resolves to the stored final key or a retry; the cleanup policy preserves shared staging for a lost lease/takeover/ambiguous commit and cleans it only after success, a confirmed rejection or a proven `finalized_ours`.
 - `apps/web/lib/realtime/revoke.test.ts`: community revocation body/target/auth, 502 retry, missing config.
 - `apps/web/lib/realtime/membership-revocation-queue.test.ts`: failure → 15 s backoff, later success, rejoined-member skip, one failed row does not stop the batch, 1 h cap, immediate close is close-only.
 - `apps/web/app/api/internal/membership-revocations/process/route.test.ts`: 401 for missing/wrong bearer, 500 when unconfigured.
@@ -174,7 +174,7 @@ The Stage 2 prompt's "additional security checks" were inspected. No new verifie
 | Check | Result |
 |---|---|
 | `apps/web: npx tsc --noEmit` | **PASS** |
-| Full web unit suite (CI glob, `APP_ENV=production`) | **1,174 / 1,174 pass** |
+| Full web unit suite (CI glob, `APP_ENV=production`) | **1,178 / 1,178 pass** |
 | `apps/realtime: npx tsc --noEmit` | **PASS** |
 | Realtime socket-limit pure + routing | **36 / 36 pass** |
 | Realtime socket-limit integration | **6 / 6 pass** (per-user, per-session, 3 devices × 2 tabs, reconnect, membership revocation isolation/duplicate/auth) |
@@ -260,6 +260,7 @@ A focused review of PR #795 asked whether the first implementation was actually 
 | 3 | **Lost commit response could delete a committed object.** If the commit RPC landed but its response was lost, the old error path deleted the final key, leaving a finalized ticket pointing at a missing object. | On a commit error/false, the route re-reads the ticket and resolves with the stored `final_key` (`resolveFinalizeCommit`): ours → return the committed attachment and keep the object; another claim's → delete only our claim-scoped copy and return the existing attachment; ambiguous DB error → leave the claim-scoped object for a retry instead of deleting a possibly referenced one. Evidence: `upload-guard.ts` `resolveFinalizeCommit`, route commit block, unit test. |
 | 4 | **Client writable final key.** A client still holding the staging presign could overwrite the finalized object if it could reach the final key. | The canonical key includes the random claim token and is never presigned. The staging key is deleted after commit; even if the client re-creates it, it is not referenced. |
 | 5 | **Crash after copy before commit.** A crash leaves a claim-specific final object with no committed ticket. | A later claimant uses a new claim token/key, so it cannot overwrite the orphan. The existing R2 orphan/reference sweep is the cleanup path; no dedicated purge was added. This is a storage-cost residual, not an integrity issue. |
+| 6 | **Poster staging cleanup before commit.** The poster staging object (and, in some branches, the video staging object) was deleted while the claim could still lose its lease or while the commit outcome was unknown. A new claimant then had no poster to process, and an ambiguous commit destroyed retry data. | Staging cleanup is now driven by `finalizeCleanup(outcome)`: only `committed`, `finalized_ours` (this request won, even if the response was lost) and `rejected` delete shared staging. `finalized_other` and `claim_lost` delete only our claim-scoped final copy. `ambiguous` deletes nothing. The pre-commit poster delete was removed; cleanup runs only after a confirmed terminal outcome. Tests cover lease loss, takeover, successful commit, ambiguous commit, and lost-response retry. |
 
 **State machine:** `pending` → `claimed` (token + lease) → `finalized` / `rejected`; `release_media_upload_ticket` returns a transiently failed claim to pending. A stale claim is reclaimable after its lease; the old token can no longer commit. The final `final_key` has a uniqueness constraint, and the route returns the committed attachment for idempotent retries.
 
@@ -283,7 +284,7 @@ The limits are **per room**: 12 sockets per user and 8 per session, with oldest-
 
 ### Second-pass verification
 
-- Web full suite: **1,174 / 1,174 pass**.
+- Web full suite: **1,178 / 1,178 pass**.
 - Realtime integration: **31 / 31 pass** solo (50,000/50,000); socket limits: **6 / 6 integration**, **8 / 8 pure**, routing **28 / 28**; remaining non-perf suites: **239 / 239**.
 - Mobile: `tsc` clean, security **18 / 18**, realtime **72 / 72**.
 - Comment audit clean.
@@ -298,7 +299,7 @@ The limits are **per room**: 12 sockets per user and 8 per session, with oldest-
 1. **Findings fixed:** 4 (AUD-05, AUD-06, AUD-49, AUD-50).
 2. **Findings implemented, live verification required:** 3 (AUD-07, AUD-08, AUD-10).
 3. **Findings still open / out of sprint:** all other audit findings listed in §3.
-4. **Tests:** web 1,174/1,174; mobile security 18/18; mobile realtime 72/72; realtime socket limits 6/6 integration + 8/8 pure; revocation 6/6; integration 31/31 solo; routing/socket pure 36/36; remaining non-perf realtime 239/239; comment audit clean; two SQL state-machine suites pass in CI.
+4. **Tests:** web 1,178/1,178; mobile security 18/18; mobile realtime 72/72; realtime socket limits 6/6 integration + 8/8 pure; revocation 6/6; integration 31/31 solo; routing/socket pure 36/36; remaining non-perf realtime 239/239; comment audit clean; two SQL state-machine suites pass in CI.
 5. **Files changed:** see §4.
 6. **Required operator actions:** apply both migrations; ensure Upstash is present; prebuild/rebuild the Android app; run the staging matrix in §11 (including concurrent-finalize/overwrite and realtime-outage drills); run miniflare suites serially.
 7. **Migration requirements:** two forward migrations (`20261106120000_media_upload_tickets.sql`, `20261106130000_realtime_membership_revocations.sql`).

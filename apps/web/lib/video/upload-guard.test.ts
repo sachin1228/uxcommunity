@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 // @ts-expect-error Node's type-stripping test runner requires an explicit TS extension.
-import { MAX_PROXY_BODY_BYTES, copiedObjectMatches, declaredBodyTooLarge, evaluateShowcaseVideoFinalize, isShowcaseVideoKey, isShowcaseVideoKeyForMedia, normalizeEtag, proxyUploadKind, readBoundedBody, resolveFinalizeCommit, showcaseFinalPosterKeyForClaim, showcaseFinalVideoKeyForClaim } from "./upload-guard.ts";
+import { MAX_PROXY_BODY_BYTES, copiedObjectMatches, declaredBodyTooLarge, evaluateShowcaseVideoFinalize, finalizeCleanup, isShowcaseVideoKey, isShowcaseVideoKeyForMedia, normalizeEtag, proxyUploadKind, readBoundedBody, resolveFinalizeCommit, showcaseFinalPosterKeyForClaim, showcaseFinalVideoKeyForClaim } from "./upload-guard.ts";
 
 const FIFTY_MB = 50 * 1024 * 1024;
 const CHUNK = 64 * 1024;
@@ -309,4 +309,44 @@ test("a lost commit response is resolved by the stored final key", () => {
     }),
     "retry",
   );
+});
+
+
+test("poster cleanup policy: a claimant that loses its lease deletes only its own result", () => {
+  // The lease expired while the poster was being processed, or another
+  // claimant took over before this request finished. The shared staging video
+  // and poster must survive for the new claimant.
+  for (const outcome of ["claim_lost", "finalized_other"] as const) {
+    const cleanup = finalizeCleanup(outcome);
+    assert.equal(cleanup.deleteStaging, false, `${outcome} must preserve staging`);
+    assert.equal(cleanup.deleteClaimFinal, true, `${outcome} may delete its own key`);
+  }
+});
+
+test("poster cleanup policy: successful commit and confirmed rejection clean staging", () => {
+  for (const outcome of ["committed", "finalized_ours", "rejected"] as const) {
+    const cleanup = finalizeCleanup(outcome);
+    assert.equal(cleanup.deleteStaging, true, `${outcome} should clean staging`);
+    assert.equal(cleanup.deleteClaimFinal, false);
+  }
+});
+
+test("poster cleanup policy: an ambiguous commit preserves everything", () => {
+  assert.deepEqual(finalizeCleanup("ambiguous"), {
+    deleteStaging: false,
+    deleteClaimFinal: false,
+  });
+});
+
+test("a retry after a lost commit response keeps the finalized attachment and cleans staging", () => {
+  const finalKey = "media/videos/finalized/m/claim.mp4";
+  const resolution = resolveFinalizeCommit({
+    committed: false,
+    commitError: new Error("response lost"),
+    current: { finalizedAt: 1, finalKey },
+    finalKey,
+  });
+  assert.equal(resolution, "finalized_ours");
+  assert.equal(finalizeCleanup("finalized_ours").deleteStaging, true);
+  assert.equal(finalizeCleanup("finalized_ours").deleteClaimFinal, false);
 });

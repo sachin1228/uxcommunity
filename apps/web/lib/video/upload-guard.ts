@@ -350,3 +350,41 @@ export function resolveFinalizeCommit(input: {
   }
   return "retry";
 }
+
+export type FinalizeCleanupOutcome =
+  | "committed"
+  | "finalized_ours"
+  | "finalized_other"
+  | "rejected"
+  | "claim_lost"
+  | "ambiguous";
+
+export interface FinalizeCleanupDecision {
+  /** Delete the shared staging video/poster — only after a confirmed terminal state. */
+  deleteStaging: boolean;
+  /** Delete this claim's final video/poster copy. */
+  deleteClaimFinal: boolean;
+}
+
+/**
+ * Cleanup policy for every finalize outcome.
+ *
+ * Shared staging objects are deleted only when this request is the confirmed
+ * winner (committed or its lost response resolved to our final key) or the
+ * ticket was confirmed rejected. A losing/stale claimant deletes only its own
+ * claim-scoped final copy. An ambiguous commit preserves everything so a
+ * retry can determine whether the commit landed.
+ */
+export function finalizeCleanup(outcome: FinalizeCleanupOutcome): FinalizeCleanupDecision {
+  switch (outcome) {
+    case "committed":
+    case "finalized_ours":
+    case "rejected":
+      return { deleteStaging: true, deleteClaimFinal: false };
+    case "finalized_other":
+    case "claim_lost":
+      return { deleteStaging: false, deleteClaimFinal: true };
+    case "ambiguous":
+      return { deleteStaging: false, deleteClaimFinal: false };
+  }
+}

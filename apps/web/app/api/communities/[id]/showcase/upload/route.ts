@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
@@ -17,6 +17,7 @@ import {
   isShowcasePosterKeyForMedia,
   isShowcaseVideoKeyForMedia,
   proxyUploadKind,
+  finalizeCleanup,
   readBoundedBody,
   resolveFinalizeCommit,
   showcaseFinalPosterKeyForClaim,
@@ -264,6 +265,16 @@ async function rejectTicket(
   return true;
 }
 
+async function deleteStagingObjects(
+  key: string,
+  posterKey: string | null,
+): Promise<void> {
+  await Promise.allSettled([
+    deleteFromR2(key),
+    ...(posterKey ? [deleteFromR2(posterKey)] : []),
+  ]);
+}
+
 /**
  * VIDEO finalization: the bytes are already in R2 (browser PUT against the
  * presigned ticket).
@@ -315,18 +326,26 @@ async function completeDirectUpload(
     return NextResponse.json({ error: "Upload verification failed." }, { status: 403 });
   }
   if (row.finalized_at) {
+    // A committed ticket is terminal; a retry can safely clean staging if the
+    // original request crashed before its post-commit cleanup.
+    after(() => deleteStagingObjects(row.staging_key, row.poster_staging_key));
     const existing = finalizedAttachment(mediaId, name, row);
     return existing
       ? NextResponse.json(existing, { status: 200 })
       : NextResponse.json({ error: "Upload verification failed." }, { status: 409 });
   }
   if (row.rejected_at) {
+    after(() => deleteStagingObjects(row.staging_key, row.poster_staging_key));
     return NextResponse.json(
       { error: "Upload verification failed. Please upload the video again." },
       { status: 410 },
     );
   }
   if (new Date(row.expires_at).getTime() <= Date.now()) {
+    // Do not touch staging if a pre-expiry claim is still processing it.
+    if (!row.claim_token) {
+      after(() => deleteStagingObjects(row.staging_key, row.poster_staging_key));
+    }
     return NextResponse.json(
       { error: "Upload verification expired. Please upload the video again." },
       { status: 410 },
@@ -422,10 +441,7 @@ async function completeDirectUpload(
     // new claimant and this request must not delete its staging bytes.
     const rejected = await rejectTicket(db, mediaId, claimToken, decision.reason);
     if (rejected) {
-      await Promise.allSettled([
-        deleteFromR2(key),
-        ...(ticket.posterStagingKey ? [deleteFromR2(ticket.posterStagingKey)] : []),
-      ]);
+      await deleteStagingObjects(key, ticket.posterStagingKey);
     }
     logEvent("warn", {
       event: "showcase.video_finalize_rejected",
@@ -460,7 +476,7 @@ async function completeDirectUpload(
     // still hold the claim and have just rejected it.
     await deleteFromR2(finalKey).catch(() => {});
     const rejected = await rejectTicket(db, mediaId, claimToken, "copied_bytes_mismatch");
-    if (rejected) await deleteFromR2(key).catch(() => {});
+    if (rejected) await deleteStagingObjects(key, ticket.posterStagingKey);
     logEvent("warn", {
       event: "showcase.video_finalize_bytes_mismatch",
       media_id: mediaId,
@@ -495,7 +511,8 @@ async function completeDirectUpload(
     } catch (error) {
       logEvent("warn", { event: "showcase.video_finalize_poster_failed", media_id: mediaId, error });
     }
-    void deleteFromR2(posterStagingKey).catch(() => {});
+    // Staging is deleted only after a confirmed commit/rejection; a claim
+    // that loses its lease must not delete bytes the new claimant may need.
   }
 
   const { data: committed, error: commitError } = await db.rpc(
@@ -530,10 +547,15 @@ async function completeDirectUpload(
     });
 
     if (resolution !== "retry") {
-      if (resolution === "finalized_other") {
-        // Another claim won; ours is claim-scoped and unreferenced.
+      const cleanup = finalizeCleanup(
+        resolution === "finalized_ours" ? "finalized_ours" : "finalized_other",
+      );
+      if (cleanup.deleteClaimFinal) {
         await deleteFromR2(finalKey).catch(() => {});
         if (finalPosterKey) void deleteFromR2(finalPosterKey).catch(() => {});
+      }
+      if (cleanup.deleteStaging) {
+        await deleteStagingObjects(key, ticket.posterStagingKey);
       }
       const existing = current ? finalizedAttachment(mediaId, name, current) : null;
       return existing
@@ -543,9 +565,13 @@ async function completeDirectUpload(
 
     if (!commitError) {
       // A definitive false: the claim was lost or the ticket was finalized by
-      // another request. The claim-scoped object is not referenced.
-      await deleteFromR2(finalKey).catch(() => {});
-      if (finalPosterKey) void deleteFromR2(finalPosterKey).catch(() => {});
+      // another request. Delete only this claim's copy; staging may belong to
+      // the new claimant.
+      const cleanup = finalizeCleanup("claim_lost");
+      if (cleanup.deleteClaimFinal) {
+        await deleteFromR2(finalKey).catch(() => {});
+        if (finalPosterKey) void deleteFromR2(finalPosterKey).catch(() => {});
+      }
       await releaseTicket(db, mediaId, claimToken, "commit_lost");
       return NextResponse.json(
         { error: "This upload has already been finalized." },
@@ -563,10 +589,10 @@ async function completeDirectUpload(
     return NextResponse.json({ error: "Could not finish the upload. Try again." }, { status: 500 });
   }
 
-  await Promise.allSettled([
-    deleteFromR2(key),
-    ...(ticket.posterStagingKey ? [deleteFromR2(ticket.posterStagingKey)] : []),
-  ]);
+  const successCleanup = finalizeCleanup("committed");
+  if (successCleanup.deleteStaging) {
+    await deleteStagingObjects(key, ticket.posterStagingKey);
+  }
 
   return NextResponse.json(
     {
