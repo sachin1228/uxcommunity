@@ -13,6 +13,7 @@ import { PhotoViewer } from "@/components/ui/PhotoViewer";
 import { ReportModal } from "@/components/communities/ReportModal";
 import type { ProfileCompanyView } from "@/components/companies/types";
 import { dmUrls } from "@/lib/direct-messages/client";
+import { safeExternalUrl } from "@/lib/security/safe-url";
 
 interface ProfileCardProps {
   name: string;
@@ -78,23 +79,6 @@ interface ProfileCardProps {
 }
 
 /**
- * Normalizes a stored link into something safe to put in `href`, or null when
- * it cannot be one. Values are user-typed, so only http(s) survives — the
- * `https://` prefix is added when the member left the scheme off.
- */
-function externalUrl(value: string | null | undefined): string | null {
-  const trimmed = value?.trim();
-  if (!trimmed) return null;
-  const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-  try {
-    const url = new URL(candidate);
-    return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * The profile hero: display picture, name, the role line (with the workplace
  * after an “@”), city line, bio and (on read-only surfaces) the member's links.
  * It carries no cover image and no card chrome of its own —
@@ -125,8 +109,8 @@ export function ProfileCard({
   messageHref,
   blockControls = null,
 }: ProfileCardProps) {
-  const portfolioUrl = externalUrl(portfolio);
-  const linkedinProfileUrl = externalUrl(linkedinUrl);
+  const portfolioUrl = safeExternalUrl(portfolio);
+  const linkedinProfileUrl = safeExternalUrl(linkedinUrl);
   // A stored picture that `AvatarImg` refuses to render (a retired generated
   // avatar) is the same as having none: the hero shows its initials instead of
   // an empty frame.

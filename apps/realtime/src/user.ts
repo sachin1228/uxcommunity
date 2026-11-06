@@ -11,6 +11,7 @@ import { TopicSocketIndex } from "./subscriptions";
 import { EventIdDedupe } from "./event-dedupe";
 import type { PublishRequest } from "./types";
 import { encodeEventFrame, helloFrame, readPublishRequest } from "./wire";
+import { roomBelongsToCommunity } from "./room-routing";
 import { secretMatches } from "./session-validation";
 
 interface RevokeRequest {
@@ -18,6 +19,8 @@ interface RevokeRequest {
   sid?: string;
   exceptSid?: string;
   all?: boolean;
+  /** Close this user's sockets only in rooms belonging to this community. */
+  communityId?: string;
 }
 
 /** A community room this user currently has at least one socket in. */
@@ -477,6 +480,10 @@ export class UserDO extends DurableObject<Env> {
       return new Response("Bad request", { status: 400 });
     }
 
+    if (body.communityId) {
+      return this.revokeCommunity(body);
+    }
+
     this.ensureReconstructed();
 
     let closed = 0;
@@ -524,6 +531,71 @@ export class UserDO extends DurableObject<Env> {
       this.metrics.sessionRevocations += 1;
       this.metrics.socketsClosedByRevocation += closed;
     }
+
+    return Response.json(
+      { ok: roomsFailed === 0, closed, roomsNotified, roomsFailed },
+      { status: roomsFailed === 0 ? 200 : 502 },
+    );
+  }
+
+  /**
+   * Membership removal: close this member's sockets in every room belonging to
+   * one community, and nowhere else.
+   *
+   * The Room DO owns the sockets, so this only routes the request. The registry
+   * of rooms is the UserDO's `revoke-room:` keys — the same set a logout fans
+   * out to — filtered by the room-name → community mapping. Idempotent: a
+   * second request closes whatever remains and reports zero for the rest.
+   */
+  private async revokeCommunity(body: RevokeRequest): Promise<Response> {
+    const communityId = body.communityId;
+    if (!communityId) return new Response("Bad request", { status: 400 });
+
+    const rooms = await this.ctx.storage.list<RegisteredRoom>({
+      prefix: "revoke-room:",
+    });
+    const targets = [...rooms.keys()]
+      .map((key) => key.slice("revoke-room:".length))
+      .filter((room) => roomBelongsToCommunity(room, communityId));
+
+    let roomsNotified = 0;
+    let roomsFailed = 0;
+    let closed = 0;
+    await Promise.all(
+      targets.map(async (room) => {
+        try {
+          const stub = this.env.COMMUNITY_DO.get(
+            this.env.COMMUNITY_DO.idFromName(room),
+          );
+          const response = await stub.fetch("https://room/revoke", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-realtime-publish-secret": this.env.REALTIME_PUBLISH_SECRET,
+            },
+            body: JSON.stringify({
+              userId: body.userId,
+              all: true,
+              membership: true,
+            }),
+          });
+          if (!response.ok) {
+            roomsFailed += 1;
+            return;
+          }
+          const result = (await response.json().catch(() => null)) as
+            | { closed?: number }
+            | null;
+          roomsNotified += 1;
+          closed += Number(result?.closed ?? 0);
+        } catch {
+          roomsFailed += 1;
+        }
+      }),
+    );
+
+    this.metrics.membershipRevocations += 1;
+    this.metrics.socketsClosedByMembership += closed;
 
     return Response.json(
       { ok: roomsFailed === 0, closed, roomsNotified, roomsFailed },

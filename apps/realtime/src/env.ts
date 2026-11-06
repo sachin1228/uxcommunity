@@ -18,4 +18,9 @@ export interface Env {
   API_URL: string;
   /** Internal API secret for membership checks. */
   API_SECRET: string;
+  /** Optional per-room connection limits (see ./socket-limits.ts). */
+  ROOM_MAX_SOCKETS_PER_USER?: string;
+  ROOM_MAX_SOCKETS_PER_SESSION?: string;
+  ROOM_UPGRADE_BURST?: string;
+  ROOM_UPGRADE_REFILL_PER_SECOND?: string;
 }

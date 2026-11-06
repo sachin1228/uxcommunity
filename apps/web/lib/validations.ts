@@ -54,17 +54,24 @@ export const signupStep2Schema = z.object({
   job_title: z.string().min(1, "Please select a job title"),
 });
 
+// Zod's `.url()` accepts any syntactically valid URL, including `javascript:`.
+// Every URL this app persists or renders must be http(s).
+const httpUrlSchema = z
+  .string()
+  .url()
+  .refine((value) => /^https?:\/\//i.test(value), "Must be an http(s) URL");
+
 export const completeSignupSchema = z.object({
   identity: directSignupStep1Schema,
   profile: signupStep2Schema,
   avatar_source: z.literal("upload").optional(),
   // Picture pre-uploaded via /api/signup/picture (validated + on R2).
-  avatar_url: z.string().url().optional(),
+  avatar_url: httpUrlSchema.optional(),
 });
 
 export const masterDataSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
-  image_url: z.string().url().optional().nullable(),
+  image_url: httpUrlSchema.optional().nullable(),
 });
 
 // Edit-profile modal: the identity slots a member can change. Each slot is

@@ -111,9 +111,21 @@ class ChatFirebaseMessagingService : ExpoFirebaseMessagingService() {
 
   override fun onMessageReceived(remoteMessage: RemoteMessage) {
     val data = remoteMessage.data
+
+    // A signed-out device must not render a notification for the account that
+    // just left. This gate is native because FCM runs without JS; it also
+    // covers the window between an implicit sign-out and the server token
+    // deletion settling on a bad network.
+    val currentUserId = ChatNotificationStateModule.currentUserId(applicationContext)
+    if (currentUserId == null) return
+
     val communityId = data["communityId"]
     val conversationId = data["conversationId"]
     val direct = data[DIRECT_KEY] == "1"
+    // A token re-pointed at another account must never show that account's
+    // message on this device.
+    val recipientId = data["recipientId"]
+    if (direct && recipientId != null && recipientId != currentUserId) return
     val mode = when {
       direct && data["type"] == "community_message" && !communityId.isNullOrBlank() -> "community"
       direct && data["type"] == "dm_message" && !conversationId.isNullOrBlank() -> "dm"

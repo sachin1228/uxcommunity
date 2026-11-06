@@ -18,9 +18,23 @@ const nativeModule =
     ? (NativeModules.ChatNotificationState as ChatNotificationStateNative | undefined)
     : undefined;
 
+let activeNotificationUserId: string | null = null;
+
 export function setNotificationUser(userId: string | null): void {
+  activeNotificationUserId = userId;
   try { nativeModule?.setCurrentUser?.(userId); }
   catch { /* Older native builds still warm on navigation and Expo receipt. */ }
+}
+
+/**
+ * Whether the JS side currently has an authenticated member.
+ *
+ * The native service has its own prefs gate for background FCM; this covers
+ * the foreground JS presentation path (a push can arrive before a revoked
+ * session's token deletion settles).
+ */
+export function isNotificationUserActive(): boolean {
+  return activeNotificationUserId !== null;
 }
 
 /** Native direct FCM bypasses Expo's JS receipt listener. A hint may carry a

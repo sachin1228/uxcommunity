@@ -94,6 +94,26 @@ export function communityIdFromRoomName(room: string): string {
 }
 
 /**
+ * Whether a registered community room belongs to `communityId`.
+ *
+ * `thread-comments:*` and `resource-comments:*` are deliberately absent: their
+ * names carry only a thread/resource id, so they cannot be mapped to a
+ * community from the name. They also carry no comment content (only a nudge),
+ * and their sockets are not membership-gated (see Room.upgrade).
+ */
+export function roomBelongsToCommunity(room: string, communityId: string): boolean {
+  if (!communityId) return false;
+  return (
+    room === `chat:${communityId}` ||
+    room === `threads:${communityId}` ||
+    room === `events:${communityId}` ||
+    room === `resources:${communityId}` ||
+    room === `rules:${communityId}` ||
+    room.startsWith(`showcase:${communityId}:`)
+  );
+}
+
+/**
  * Resolve which Durable Object owns a logical room.
  *
  * The returned `name` is the DO instance to address; the caller must keep

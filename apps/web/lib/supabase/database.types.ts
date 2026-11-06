@@ -1881,6 +1881,87 @@ export type Database = {
         };
         Relationships: [];
       };
+      media_upload_tickets: {
+        Row: {
+          claim_attempts: number;
+          claim_started_at: string | null;
+          claim_token: string | null;
+          community_id: string;
+          content_type: string;
+          created_at: string;
+          expected_size: number;
+          expires_at: string;
+          final_key: string | null;
+          final_poster_key: string | null;
+          final_size: number | null;
+          finalized_at: string | null;
+          id: string;
+          last_error: string | null;
+          media_id: string;
+          poster_staging_key: string | null;
+          rejected_at: string | null;
+          staging_key: string;
+          user_id: string;
+        };
+        Insert: {
+          claim_attempts?: number;
+          claim_started_at?: string | null;
+          claim_token?: string | null;
+          community_id: string;
+          content_type: string;
+          created_at?: string;
+          expected_size: number;
+          expires_at: string;
+          final_key?: string | null;
+          final_poster_key?: string | null;
+          final_size?: number | null;
+          finalized_at?: string | null;
+          id?: string;
+          last_error?: string | null;
+          media_id: string;
+          poster_staging_key?: string | null;
+          rejected_at?: string | null;
+          staging_key: string;
+          user_id: string;
+        };
+        Update: {
+          claim_attempts?: number;
+          claim_started_at?: string | null;
+          claim_token?: string | null;
+          community_id?: string;
+          content_type?: string;
+          created_at?: string;
+          expected_size?: number;
+          expires_at?: string;
+          final_key?: string | null;
+          final_poster_key?: string | null;
+          final_size?: number | null;
+          finalized_at?: string | null;
+          id?: string;
+          last_error?: string | null;
+          media_id?: string;
+          poster_staging_key?: string | null;
+          rejected_at?: string | null;
+          staging_key?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "media_upload_tickets_community_id_fkey";
+            columns: ["community_id"];
+            isOneToOne: false;
+            referencedRelation: "communities";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "media_upload_tickets_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       member_resumes: {
         Row: {
           created_at: string;
@@ -2345,6 +2426,54 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "push_tokens_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      realtime_membership_revocations: {
+        Row: {
+          attempts: number;
+          community_id: string;
+          completed_at: string | null;
+          created_at: string;
+          id: string;
+          last_error: string | null;
+          next_attempt_at: string;
+          user_id: string;
+        };
+        Insert: {
+          attempts?: number;
+          community_id: string;
+          completed_at?: string | null;
+          created_at?: string;
+          id?: string;
+          last_error?: string | null;
+          next_attempt_at?: string;
+          user_id: string;
+        };
+        Update: {
+          attempts?: number;
+          community_id?: string;
+          completed_at?: string | null;
+          created_at?: string;
+          id?: string;
+          last_error?: string | null;
+          next_attempt_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "realtime_membership_revocations_community_id_fkey";
+            columns: ["community_id"];
+            isOneToOne: false;
+            referencedRelation: "communities";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "realtime_membership_revocations_user_id_fkey";
             columns: ["user_id"];
             isOneToOne: false;
             referencedRelation: "users";
@@ -3081,6 +3210,49 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      claim_media_upload_ticket: {
+        Args: {
+          p_media_id: string;
+          p_user_id: string;
+          p_community_id: string;
+          p_claim_token: string;
+          p_lease_seconds?: number;
+        };
+        Returns: Database["public"]["Tables"]["media_upload_tickets"]["Row"][];
+      };
+      commit_media_upload_ticket: {
+        Args: {
+          p_media_id: string;
+          p_claim_token: string;
+          p_final_key: string;
+          p_final_poster_key: string | null;
+          p_final_size: number;
+        };
+        Returns: boolean;
+      };
+      reject_media_upload_ticket: {
+        Args: {
+          p_media_id: string;
+          p_claim_token: string;
+          p_error?: string | null;
+        };
+        Returns: boolean;
+      };
+      remove_community_member_with_revocation: {
+        Args: {
+          p_community_id: string;
+          p_user_id: string;
+        };
+        Returns: boolean;
+      };
+      release_media_upload_ticket: {
+        Args: {
+          p_media_id: string;
+          p_claim_token: string;
+          p_error?: string | null;
+        };
+        Returns: boolean;
+      };
       change_user_password: {
         Args: {
           p_user_id: string;

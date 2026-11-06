@@ -28,7 +28,7 @@ jobs:
           python3 scripts/db/test_compare.py
           python3 scripts/db/test_migrations.py
           python3 scripts/db/test_initialization.py
-          python3 scripts/db/test_fresh.py --runtime docker supabase/tests/performance_rpcs.test.sql supabase/tests/public_read_exposure.test.sql supabase/tests/member_count.test.sql supabase/tests/session_revocation.test.sql supabase/tests/login_performance.test.sql supabase/tests/login_community_backfill.test.sql supabase/tests/official_community_images.test.sql
+          python3 scripts/db/test_fresh.py --runtime docker supabase/tests/performance_rpcs.test.sql supabase/tests/public_read_exposure.test.sql supabase/tests/member_count.test.sql supabase/tests/session_revocation.test.sql supabase/tests/login_performance.test.sql supabase/tests/login_community_backfill.test.sql supabase/tests/official_community_images.test.sql supabase/tests/media_upload_tickets.test.sql supabase/tests/realtime_membership_revocations.test.sql
       - name: Upload schema comparison
         if: always()
         uses: actions/upload-artifact@v4

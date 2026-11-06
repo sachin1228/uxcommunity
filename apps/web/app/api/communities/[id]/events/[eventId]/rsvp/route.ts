@@ -5,6 +5,7 @@ import { requireSession } from "@/lib/auth/session";
 import { deferNotification, eventHref } from "@/lib/notifications";
 import { loadEventForViewer } from "@/lib/communities/event-access";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
+import { attemptMembershipRevocationNow } from "@/lib/realtime/membership-revocation-queue";
 import {
   canJoinEventChat,
   ensureEventChatCommunity,
@@ -93,7 +94,14 @@ export async function POST(
       const chat = await getEventChatCommunity(db, eventId);
       if (chat) {
         leftChatCommunityId = chat.id;
-        await leaveEventChat(db, chat.id, userId);
+        const left = await leaveEventChat(db, chat.id, userId);
+        if (left === "removed") {
+          // The atomic RPC wrote the durable queue row; this is the fast close.
+          await attemptMembershipRevocationNow(userId, chat.id);
+        }
+        // "owner" is never removed from the room. "failed" means the delete
+        // rolled back, so the member is still in the room and must keep their
+        // socket. The RSVP itself is already withdrawn.
       }
     } catch (error) {
       console.error("[event RSVP] group chat leave failed:", error);

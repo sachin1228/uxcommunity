@@ -34,6 +34,8 @@ import {
   type PushTokenPair,
 } from './pushRegistrationCoordinator';
 import { settleAbandonedRegistration } from './pushRegistrationState';
+import { isNotificationUserActive } from './chatNotificationState';
+import { shouldPresentPush } from './pushPresentation';
 import { timedOutMessage, withTimeout } from './withTimeout';
 
 /** Where this device's Expo push token is remembered for logout cleanup. */
@@ -305,13 +307,16 @@ export function registerNotificationHandler(): void {
         'communityId' in data &&
         !!data.communityId &&
         communityStore.activeCommunityId === data.communityId;
-      const suppress = muted || alreadyReading;
+      const signedIn = isNotificationUserActive();
+      const suppress =
+        !shouldPresentPush({ signedIn, muted, alreadyReading });
       const badge =
         data.type === 'community_message' && typeof data.badge === 'number' ? data.badge : null;
 
-      // The badge is applied even for a suppressed notification: muting a
-      // community stops it interrupting, not from counting as unread.
-      if (badge !== null) {
+      // The badge is applied even for a muted/suppressed notification: muting
+      // a community stops it interrupting, not from counting as unread. A
+      // signed-out device gets neither the notification nor the badge.
+      if (badge !== null && signedIn) {
         void Notifications.setBadgeCountAsync(badge).catch(() => {});
       }
 
@@ -319,7 +324,7 @@ export function registerNotificationHandler(): void {
         shouldShowBanner: !suppress,
         shouldShowList: !suppress,
         shouldPlaySound: !suppress,
-        shouldSetBadge: true,
+        shouldSetBadge: signedIn,
       };
     },
   });

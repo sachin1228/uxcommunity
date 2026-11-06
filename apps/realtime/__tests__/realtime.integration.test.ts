@@ -607,9 +607,10 @@ describe("Membership authorization", () => {
         ws.on("open", () => resolveStatus(200));
         setTimeout(() => resolveStatus(0), 5000);
       });
-      // The handshake now refuses a dead API at session validation (401) before
-      // the DO's membership check (403); either way it must never open.
-      expect([401, 403]).toContain(status);
+      // A dead API is refused at session validation (401), by the DO's
+      // membership check (403), or by the Worker's configuration guard (503).
+      // Every path must refuse the socket.
+      expect([401, 403, 503]).toContain(status);
       try { ws.close(); } catch { /* ignore */ }
     } finally {
       await outageWorker.stop();

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getProfileCompanyState } from "@/lib/companies/service";
+import { parseProfileLinkUpdates } from "@/lib/profile/urls";
 import { resolveProfileRoleLabel } from "@/lib/profile/role-label";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -58,13 +59,23 @@ export async function PATCH(request: NextRequest) {
   let body: {
     name?: string;
     bio?: string;
-    linkedin_url?: string;
-    portfolio_url?: string;
+    linkedin_url?: unknown;
+    portfolio_url?: unknown;
   };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+
+  // Validate both links before any write. A stored `javascript:` URL is the
+  // admin-card XSS (audit AUD-06); only http(s) with no credentials survives.
+  const links = parseProfileLinkUpdates(body);
+  if (Object.keys(links.errors).length > 0) {
+    return NextResponse.json(
+      { error: "Validation failed", issues: links.errors },
+      { status: 422 },
+    );
   }
 
   const db = createServiceClient();
@@ -89,8 +100,12 @@ export async function PATCH(request: NextRequest) {
     const bio = body.bio.trim();
     profilePatch.bio = bio || null;
   }
-  if (typeof body.linkedin_url === "string") profilePatch.linkedin_url = body.linkedin_url.trim() || null;
-  if (typeof body.portfolio_url === "string") profilePatch.portfolio_url = body.portfolio_url.trim() || null;
+  if (links.patch.linkedin_url !== undefined) {
+    profilePatch.linkedin_url = links.patch.linkedin_url;
+  }
+  if (links.patch.portfolio_url !== undefined) {
+    profilePatch.portfolio_url = links.patch.portfolio_url;
+  }
 
   if (Object.keys(profilePatch).length > 0) {
     const { error } = await db.from("designer_profiles").update(profilePatch).eq("user_id", userId);

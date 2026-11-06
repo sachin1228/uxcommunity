@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 // @ts-expect-error Node's type-stripping test runner requires an explicit TS extension.
-import { MAX_PROXY_BODY_BYTES, declaredBodyTooLarge, isShowcaseVideoKey, isShowcaseVideoKeyForMedia, proxyUploadKind, readBoundedBody } from "./upload-guard.ts";
+import { MAX_PROXY_BODY_BYTES, copiedObjectMatches, declaredBodyTooLarge, evaluateShowcaseVideoFinalize, finalizeCleanup, isShowcaseVideoKey, isShowcaseVideoKeyForMedia, normalizeEtag, proxyUploadKind, readBoundedBody, resolveFinalizeCommit, showcaseFinalPosterKeyForClaim, showcaseFinalVideoKeyForClaim } from "./upload-guard.ts";
 
 const FIFTY_MB = 50 * 1024 * 1024;
 const CHUNK = 64 * 1024;
@@ -118,4 +118,235 @@ test("object keys are bound to the media id they were issued for", () => {
   assert.equal(isShowcaseVideoKey("media/videos/processed/../../secret.mp4"), false);
   assert.equal(isShowcaseVideoKey("media/videos/processed/not-a-uuid.mp4"), false);
   assert.equal(isShowcaseVideoKey("media/videos/processed/" + mediaId + ".exe"), false);
+});
+
+test("finalize accepts only the ticket owner with a matching HEAD", () => {
+  const mediaId = "3f8a1c2e-4b5d-4e6f-8a9b-0c1d2e3f4a5b";
+  const owner = "aaaaaaaa-1111-4111-8111-111111111111";
+  const community = "bbbbbbbb-2222-4222-8222-222222222222";
+  const key = `media/videos/processed/${mediaId}.mp4`;
+  const ticket = {
+    mediaId,
+    userId: owner,
+    communityId: community,
+    stagingKey: key,
+    posterStagingKey: null,
+    contentType: "video/mp4",
+    expectedSize: 1_000,
+    expiresAt: Date.now() + 60_000,
+    finalizedAt: null,
+    rejectedAt: null,
+  };
+  const body = {
+    ticket,
+    sessionUserId: owner,
+    communityId: community,
+    mediaId,
+    key,
+    type: "video/mp4",
+    reportedSize: 1_000,
+    object: { contentLength: 1_000, contentType: "video/mp4", etag: "\"etag-a\"" },
+  };
+
+  const accepted = evaluateShowcaseVideoFinalize(body);
+  assert.equal(accepted.ok, true);
+
+  const claimA = "11111111-1111-4111-8111-111111111111";
+  const claimB = "22222222-2222-4222-8222-222222222222";
+  const finalA = showcaseFinalVideoKeyForClaim(key, mediaId, claimA);
+  const finalB = showcaseFinalVideoKeyForClaim(key, mediaId, claimB);
+  assert.equal(finalA, `media/videos/finalized/${mediaId}/${claimA}.mp4`);
+  assert.notEqual(finalA, finalB, "a losing claim must not share the winner's key");
+  assert.equal(
+    showcaseFinalPosterKeyForClaim(mediaId, claimA),
+    `media/videos/finalized/${mediaId}/${claimA}-poster.jpg`,
+  );
+
+  const unauthorized = evaluateShowcaseVideoFinalize({
+    ...body,
+    sessionUserId: "cccccccc-3333-4333-8333-333333333333",
+  });
+  assert.equal(unauthorized.ok, false);
+  if (!unauthorized.ok) assert.equal(unauthorized.reason, "not_owner");
+
+  const oversized = evaluateShowcaseVideoFinalize({
+    ...body,
+    object: { contentLength: 51 * 1024 * 1024, contentType: "video/mp4", etag: "\"etag-a\"" },
+  });
+  assert.equal(oversized.ok, false);
+  if (!oversized.ok) assert.equal(oversized.reason, "object_too_large");
+
+  const actualMismatch = evaluateShowcaseVideoFinalize({
+    ...body,
+    object: { contentLength: 999, contentType: "video/mp4", etag: "\"etag-a\"" },
+  });
+  assert.equal(actualMismatch.ok, false);
+  if (!actualMismatch.ok) assert.equal(actualMismatch.reason, "actual_size_mismatch");
+
+  const reportedMismatch = evaluateShowcaseVideoFinalize({
+    ...body,
+    reportedSize: 999,
+  });
+  assert.equal(reportedMismatch.ok, false);
+  if (!reportedMismatch.ok) assert.equal(reportedMismatch.reason, "reported_size_mismatch");
+
+  const missing = evaluateShowcaseVideoFinalize({ ...body, object: null });
+  assert.equal(missing.ok, false);
+  if (!missing.ok) assert.equal(missing.reason, "object_missing");
+
+  const reused = evaluateShowcaseVideoFinalize({
+    ...body,
+    ticket: { ...ticket, finalizedAt: Date.now() },
+  });
+  assert.equal(reused.ok, false);
+  if (!reused.ok) assert.equal(reused.reason, "already_finalized");
+
+  const badType = evaluateShowcaseVideoFinalize({ ...body, type: "video/quicktime" });
+  assert.equal(badType.ok, false);
+  if (!badType.ok) assert.equal(badType.reason, "type_mismatch");
+
+  const spoofedType = evaluateShowcaseVideoFinalize({
+    ...body,
+    object: { contentLength: 1_000, contentType: "text/html", etag: "\"etag-a\"" },
+  });
+  assert.equal(spoofedType.ok, false);
+  if (!spoofedType.ok) assert.equal(spoofedType.reason, "object_type_mismatch");
+
+  const expired = evaluateShowcaseVideoFinalize({
+    ...body,
+    now: ticket.expiresAt,
+  });
+  assert.equal(expired.ok, false);
+  if (!expired.ok) assert.equal(expired.reason, "expired");
+
+  assert.equal(evaluateShowcaseVideoFinalize({ ...body, ticket: null }).ok, false);
+});
+
+
+test("copied bytes must match the staging ETag and metadata", () => {
+  const source = {
+    contentLength: 1_000,
+    contentType: "video/mp4",
+    etag: "\"abc123\"",
+  };
+  assert.equal(
+    copiedObjectMatches(
+      source,
+      { contentLength: 1_000, contentType: "video/mp4", etag: "\"abc123\"" },
+      "video/mp4",
+      1_000,
+    ),
+    true,
+  );
+  // A concurrent PUT replaced the staging object between HEAD and copy.
+  assert.equal(
+    copiedObjectMatches(
+      source,
+      { contentLength: 1_000, contentType: "video/mp4", etag: "\"different\"" },
+      "video/mp4",
+      1_000,
+    ),
+    false,
+  );
+  assert.equal(
+    copiedObjectMatches(
+      source,
+      { contentLength: 999, contentType: "video/mp4", etag: "\"abc123\"" },
+      "video/mp4",
+      1_000,
+    ),
+    false,
+  );
+  assert.equal(
+    copiedObjectMatches(
+      source,
+      { contentLength: 1_000, contentType: "text/html", etag: "\"abc123\"" },
+      "video/mp4",
+      1_000,
+    ),
+    false,
+  );
+  // No ETag means exact-bytes verification failed; do not commit.
+  assert.equal(
+    copiedObjectMatches(
+      { ...source, etag: null },
+      { contentLength: 1_000, contentType: "video/mp4", etag: null },
+      "video/mp4",
+      1_000,
+    ),
+    false,
+  );
+  assert.equal(normalizeEtag('W/"abc"'), "abc");
+});
+
+
+test("a lost commit response is resolved by the stored final key", () => {
+  const finalKey = "media/videos/finalized/m/claim.mp4";
+  assert.equal(
+    resolveFinalizeCommit({
+      committed: false,
+      commitError: new Error("response lost"),
+      current: { finalizedAt: 1, finalKey },
+      finalKey,
+    }),
+    "finalized_ours",
+  );
+  assert.equal(
+    resolveFinalizeCommit({
+      committed: false,
+      commitError: null,
+      current: { finalizedAt: 1, finalKey: "media/videos/finalized/m/other.mp4" },
+      finalKey,
+    }),
+    "finalized_other",
+  );
+  assert.equal(
+    resolveFinalizeCommit({
+      committed: false,
+      commitError: new Error("db down"),
+      current: { finalizedAt: null, finalKey: null },
+      finalKey,
+    }),
+    "retry",
+  );
+});
+
+
+test("poster cleanup policy: a claimant that loses its lease deletes only its own result", () => {
+  // The lease expired while the poster was being processed, or another
+  // claimant took over before this request finished. The shared staging video
+  // and poster must survive for the new claimant.
+  for (const outcome of ["claim_lost", "finalized_other"] as const) {
+    const cleanup = finalizeCleanup(outcome);
+    assert.equal(cleanup.deleteStaging, false, `${outcome} must preserve staging`);
+    assert.equal(cleanup.deleteClaimFinal, true, `${outcome} may delete its own key`);
+  }
+});
+
+test("poster cleanup policy: successful commit and confirmed rejection clean staging", () => {
+  for (const outcome of ["committed", "finalized_ours", "rejected"] as const) {
+    const cleanup = finalizeCleanup(outcome);
+    assert.equal(cleanup.deleteStaging, true, `${outcome} should clean staging`);
+    assert.equal(cleanup.deleteClaimFinal, false);
+  }
+});
+
+test("poster cleanup policy: an ambiguous commit preserves everything", () => {
+  assert.deepEqual(finalizeCleanup("ambiguous"), {
+    deleteStaging: false,
+    deleteClaimFinal: false,
+  });
+});
+
+test("a retry after a lost commit response keeps the finalized attachment and cleans staging", () => {
+  const finalKey = "media/videos/finalized/m/claim.mp4";
+  const resolution = resolveFinalizeCommit({
+    committed: false,
+    commitError: new Error("response lost"),
+    current: { finalizedAt: 1, finalKey },
+    finalKey,
+  });
+  assert.equal(resolution, "finalized_ours");
+  assert.equal(finalizeCleanup("finalized_ours").deleteStaging, true);
+  assert.equal(finalizeCleanup("finalized_ours").deleteClaimFinal, false);
 });

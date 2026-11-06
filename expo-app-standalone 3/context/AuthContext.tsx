@@ -234,6 +234,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // cache when the identity ends so a shared device does not retain them.
         void Image.clearMemoryCache();
       },
+      unregisterPush: () =>
+        unregisterStoredPushTokenAsync({
+          shouldClear: () => sessionClock.isCurrent(cleanupEpochRef.current),
+        }),
       clearSession,
       ...clearSteps,
     }),

@@ -21,7 +21,7 @@
  *     different upload.
  */
 
-import { VIDEO_MIME_TYPES } from "@uxcommunity/shared";
+import { MAX_VIDEO_BYTES, VIDEO_MIME_TYPES } from "@uxcommunity/shared";
 
 /**
  * Media the multipart proxy path may serve. Images only — they are compressed
@@ -141,4 +141,250 @@ export function isShowcaseVideoKeyForMedia(key: string, mediaId: string): boolea
   const match = SHOWCASE_VIDEO_KEY_RE.exec(key);
   if (!match) return false;
   return match[1].toLowerCase() === mediaId.trim().toLowerCase();
+}
+
+/**
+ * Staging → claim-specific canonical key.
+ *
+ * The client can overwrite the staging URL until its presign expires, so
+ * finalize copies the verified object to a key no client has a signed URL
+ * for. The key includes the finalize claim token: a losing or stale claimant
+ * copies to a different key and can never overwrite the winner's object.
+ */
+export function showcaseFinalVideoKeyForClaim(
+  key: string,
+  mediaId: string,
+  claimToken: string,
+): string | null {
+  if (!isShowcaseVideoKeyForMedia(key, mediaId)) return null;
+  const extension = key.slice(key.lastIndexOf("."));
+  return `media/videos/finalized/${mediaId.trim().toLowerCase()}/${claimToken.trim().toLowerCase()}${extension}`;
+}
+
+export function isShowcasePosterKeyForMedia(key: string, mediaId: string): boolean {
+  return key === `media/videos/posters/${mediaId.trim().toLowerCase()}.jpg`;
+}
+
+export function showcaseFinalPosterKeyForClaim(
+  mediaId: string,
+  claimToken: string,
+): string {
+  return `media/videos/finalized/${mediaId.trim().toLowerCase()}/${claimToken.trim().toLowerCase()}-poster.jpg`;
+}
+
+export interface VideoUploadTicket {
+  mediaId: string;
+  userId: string;
+  communityId: string;
+  stagingKey: string;
+  posterStagingKey: string | null;
+  contentType: string;
+  expectedSize: number;
+  /** Unix ms. */
+  expiresAt: number;
+  /** Unix ms, or null when not finalized. */
+  finalizedAt: number | null;
+  /** Unix ms, or null when not rejected. */
+  rejectedAt: number | null;
+}
+
+export interface R2HeadMetadata {
+  contentLength: number;
+  contentType: string | null;
+  /** R2's content MD5 for a single-part PUT; the exact-bytes receipt. */
+  etag: string | null;
+}
+
+export function normalizeEtag(value: string | null | undefined): string {
+  return (value ?? "").trim().replace(/^W\//i, "").replace(/"/g, "");
+}
+
+/**
+ * True when the copied object is byte-identical to the staging object that
+ * was HEAD-verified. R2's ETag for these single-PUT objects is the content
+ * MD5; a concurrent overwrite between the HEAD and the copy changes it and is
+ * rejected rather than committed.
+ */
+export function copiedObjectMatches(
+  source: R2HeadMetadata,
+  copied: R2HeadMetadata | null,
+  expectedType: string,
+  expectedSize: number,
+): boolean {
+  if (!copied) return false;
+  const sourceEtag = normalizeEtag(source.etag);
+  const copiedEtag = normalizeEtag(copied.etag);
+  if (!sourceEtag || !copiedEtag || sourceEtag !== copiedEtag) return false;
+  return (
+    copied.contentLength === expectedSize &&
+    source.contentLength === expectedSize &&
+    copied.contentType !== null &&
+    copied.contentType.split(";")[0].trim().toLowerCase() === expectedType.toLowerCase()
+  );
+}
+
+export type VideoFinalizeRejection =
+  | "ticket_missing"
+  | "not_owner"
+  | "already_finalized"
+  | "rejected"
+  | "expired"
+  | "reference_mismatch"
+  | "type_mismatch"
+  | "size_invalid"
+  | "reported_size_mismatch"
+  | "object_missing"
+  | "object_too_large"
+  | "actual_size_mismatch"
+  | "object_type_mismatch";
+
+export type VideoFinalizeDecision =
+  | { ok: true }
+  | { ok: false; reason: VideoFinalizeRejection };
+
+export interface VideoFinalizeInput {
+  ticket: VideoUploadTicket | null;
+  sessionUserId: string;
+  communityId: string;
+  mediaId: string;
+  key: string;
+  type: string;
+  reportedSize: number;
+  object: R2HeadMetadata | null;
+  now?: number;
+  maxBytes?: number;
+}
+
+function normalizedContentType(value: string | null): string {
+  return (value ?? "").split(";")[0].trim().toLowerCase();
+}
+
+/**
+ * The finalize decision, pure and exhaustively testable.
+ *
+ * The ticket, not the request body, is authoritative for ownership, expiry,
+ * type and expected size. The R2 HEAD, not the body, is authoritative for the
+ * object's real size and type. A rejection is a permanent failure for that
+ * ticket; the route deletes the staging object so it cannot be finalized later.
+ */
+export function evaluateShowcaseVideoFinalize(
+  input: VideoFinalizeInput,
+): VideoFinalizeDecision {
+  const {
+    ticket,
+    sessionUserId,
+    communityId,
+    mediaId,
+    key,
+    type,
+    reportedSize,
+    object,
+    now = Date.now(),
+    maxBytes = MAX_VIDEO_BYTES,
+  } = input;
+
+  if (!ticket) return { ok: false, reason: "ticket_missing" };
+  if (ticket.userId !== sessionUserId || ticket.communityId !== communityId) {
+    return { ok: false, reason: "not_owner" };
+  }
+  if (ticket.finalizedAt !== null) return { ok: false, reason: "already_finalized" };
+  if (ticket.rejectedAt !== null) return { ok: false, reason: "rejected" };
+  if (ticket.expiresAt <= now) return { ok: false, reason: "expired" };
+  if (
+    ticket.mediaId.toLowerCase() !== mediaId.trim().toLowerCase() ||
+    ticket.stagingKey !== key ||
+    !isShowcaseVideoKeyForMedia(key, mediaId)
+  ) {
+    return { ok: false, reason: "reference_mismatch" };
+  }
+
+  const expectedType = ticket.contentType.toLowerCase();
+  if (!VIDEO_MIME_TYPES.has(type) || type.toLowerCase() !== expectedType) {
+    return { ok: false, reason: "type_mismatch" };
+  }
+  if (!Number.isFinite(reportedSize) || reportedSize <= 0 || reportedSize > maxBytes) {
+    return { ok: false, reason: "size_invalid" };
+  }
+  if (Math.round(reportedSize) !== ticket.expectedSize) {
+    return { ok: false, reason: "reported_size_mismatch" };
+  }
+  if (!object) return { ok: false, reason: "object_missing" };
+  if (object.contentLength <= 0 || object.contentLength > maxBytes) {
+    return { ok: false, reason: "object_too_large" };
+  }
+  if (object.contentLength !== ticket.expectedSize) {
+    return { ok: false, reason: "actual_size_mismatch" };
+  }
+  if (normalizedContentType(object.contentType) !== expectedType) {
+    return { ok: false, reason: "object_type_mismatch" };
+  }
+
+  return { ok: true };
+}
+
+export type FinalizeCommitResolution =
+  | "finalized_ours"
+  | "finalized_other"
+  | "retry";
+
+/**
+ * Interpret a commit RPC outcome after a possibly-lost response.
+ *
+ * A finalized ticket whose stored key is the one this request copied means the
+ * commit landed (return it; never delete the object). A finalized ticket with
+ * a different key means another claim won (delete this claim-scoped copy and
+ * return the winner). Anything else is safe to retry; when the RPC errored the
+ * caller must leave the claim-scoped object in place because the commit may
+ * have landed without a response.
+ */
+export function resolveFinalizeCommit(input: {
+  committed: boolean;
+  commitError: unknown;
+  current: { finalizedAt: number | null; finalKey: string | null } | null;
+  finalKey: string;
+}): FinalizeCommitResolution {
+  if (input.current?.finalizedAt != null) {
+    return input.current.finalKey === input.finalKey
+      ? "finalized_ours"
+      : "finalized_other";
+  }
+  return "retry";
+}
+
+export type FinalizeCleanupOutcome =
+  | "committed"
+  | "finalized_ours"
+  | "finalized_other"
+  | "rejected"
+  | "claim_lost"
+  | "ambiguous";
+
+export interface FinalizeCleanupDecision {
+  /** Delete the shared staging video/poster — only after a confirmed terminal state. */
+  deleteStaging: boolean;
+  /** Delete this claim's final video/poster copy. */
+  deleteClaimFinal: boolean;
+}
+
+/**
+ * Cleanup policy for every finalize outcome.
+ *
+ * Shared staging objects are deleted only when this request is the confirmed
+ * winner (committed or its lost response resolved to our final key) or the
+ * ticket was confirmed rejected. A losing/stale claimant deletes only its own
+ * claim-scoped final copy. An ambiguous commit preserves everything so a
+ * retry can determine whether the commit landed.
+ */
+export function finalizeCleanup(outcome: FinalizeCleanupOutcome): FinalizeCleanupDecision {
+  switch (outcome) {
+    case "committed":
+    case "finalized_ours":
+    case "rejected":
+      return { deleteStaging: true, deleteClaimFinal: false };
+    case "finalized_other":
+    case "claim_lost":
+      return { deleteStaging: false, deleteClaimFinal: true };
+    case "ambiguous":
+      return { deleteStaging: false, deleteClaimFinal: false };
+  }
 }

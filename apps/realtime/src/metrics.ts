@@ -87,6 +87,14 @@ export class RealtimeMetrics {
   sessionRevocations = 0;
   /** Sockets closed because their session was revoked. */
   socketsClosedByRevocation = 0;
+  /** Existing sockets evicted to stay within the per-user/per-session cap. */
+  connectionsEvictedLimit = 0;
+  /** Upgrade attempts refused by the per-user upgrade token bucket. */
+  upgradeRateLimited = 0;
+  /** Membership-removal revocation requests handled by this room. */
+  membershipRevocations = 0;
+  /** Sockets closed because the member left/was removed from the community. */
+  socketsClosedByMembership = 0;
 
   toJSON(): Record<string, number> {
     return {
@@ -115,6 +123,10 @@ export class RealtimeMetrics {
       membershipCacheEvictions: this.membershipCacheEvictions,
       sessionRevocations: this.sessionRevocations,
       socketsClosedByRevocation: this.socketsClosedByRevocation,
+      connectionsEvictedLimit: this.connectionsEvictedLimit,
+      upgradeRateLimited: this.upgradeRateLimited,
+      membershipRevocations: this.membershipRevocations,
+      socketsClosedByMembership: this.socketsClosedByMembership,
     };
   }
 }

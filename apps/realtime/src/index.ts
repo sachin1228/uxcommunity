@@ -17,6 +17,7 @@ import { logEvent } from "./log";
 import { runRetentionSweep } from "./retention";
 import { runEventLifecycleNotifications } from "./event-notifications";
 import { runVerificationReapplyEmails } from "./verification-emails";
+import { runMembershipRevocationRetries } from "./membership-revocations";
 export { UserDO } from "./user";
 export { Room } from "./room";
 export { AlertMonitor } from "./alert-monitor";
@@ -46,6 +47,55 @@ const FANOUT_RETRY_ATTEMPTS = 3;
 const FANOUT_RETRY_BASE_MS = 60;
 const FANOUT_RETRY_MAX_MS = 300;
 const FANOUT_RETRY_JITTER = 0.3;
+
+/**
+ * Coarse per-IP handshake budget.
+ *
+ * The Room DO enforces the authoritative per-user/per-session socket caps;
+ * this only stops an unauthenticated flood from spending CPU on JWT and
+ * registry checks. It is per Worker isolate, so it is a burst damper, not a
+ * global quota — the DO caps remain the hard limit on retained sockets.
+ */
+// Sized for a shared NAT/office with several hundred devices, not a single
+// user: the Room DO's per-user/per-session caps are the authoritative limit.
+// This only stops an unauthenticated flood from spending CPU on auth checks.
+const UPGRADE_BURST = 1_200;
+const UPGRADE_REFILL_PER_SECOND = 200;
+const UPGRADE_BUCKET_MAX_IPS = 5_000;
+const upgradeBuckets = new Map<string, { tokens: number; updatedAt: number }>();
+
+function allowUpgradeFromIp(ip: string | null): boolean {
+  if (!ip) return true;
+  const now = Date.now();
+  let bucket = upgradeBuckets.get(ip);
+  if (!bucket) {
+    if (upgradeBuckets.size >= UPGRADE_BUCKET_MAX_IPS) {
+      // Reclaim idle/full buckets before refusing a new address; the map must
+      // not become a permanent denial of new IPs on a long-lived isolate.
+      for (const [key, value] of upgradeBuckets) {
+        if (now - value.updatedAt > 60_000 || value.tokens >= UPGRADE_BURST) {
+          upgradeBuckets.delete(key);
+        }
+        if (upgradeBuckets.size < UPGRADE_BUCKET_MAX_IPS) break;
+      }
+      if (upgradeBuckets.size >= UPGRADE_BUCKET_MAX_IPS) return false;
+    }
+    bucket = { tokens: UPGRADE_BURST, updatedAt: now };
+    upgradeBuckets.set(ip, bucket);
+  } else {
+    const elapsed = (now - bucket.updatedAt) / 1000;
+    if (elapsed > 0) {
+      bucket.tokens = Math.min(
+        UPGRADE_BURST,
+        bucket.tokens + elapsed * UPGRADE_REFILL_PER_SECOND,
+      );
+      bucket.updatedAt = now;
+    }
+  }
+  if (bucket.tokens < 1) return false;
+  bucket.tokens -= 1;
+  return true;
+}
 
 function secretKey(secret: string): Uint8Array {
   return new TextEncoder().encode(secret);
@@ -129,10 +179,18 @@ export default {
       return;
     }
     if (controller.cron === EVENT_LIFECYCLE_CRON) {
-      await runEventLifecycleNotifications(env);
-      // The reapply email is due once a member's one-month window opens; the
-      // per-user sent timestamp makes a minute tick cheap and idempotent.
-      await runVerificationReapplyEmails(env);
+      // Independent jobs; run them together so a slow notification/email
+      // endpoint cannot delay (or starve) the security-critical membership
+      // revocation drain. Each driver catches its own failures.
+      await Promise.all([
+        runEventLifecycleNotifications(env),
+        // The reapply email is due once a member's one-month window opens; the
+        // per-user sent timestamp makes a minute tick cheap and idempotent.
+        runVerificationReapplyEmails(env),
+        // A membership removal whose immediate socket close failed stays in
+        // the durable queue until this tick (or a later one) confirms it.
+        runMembershipRevocationRetries(env),
+      ]);
       return;
     }
     if (controller.cron !== ALERT_MONITOR_CRON) {
@@ -148,7 +206,17 @@ export default {
   },
 
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    assertServiceUrl(env.API_URL, { APP_ENV: env.APP_ENV, STAGING_ALLOWED_ORIGINS: env.STAGING_ALLOWED_ORIGINS });
+    try {
+      assertServiceUrl(env.API_URL, {
+        APP_ENV: env.APP_ENV,
+        STAGING_ALLOWED_ORIGINS: env.STAGING_ALLOWED_ORIGINS,
+      });
+    } catch {
+      // A Worker deployed without a usable membership API must fail closed
+      // (never open a community socket) and say so as an unavailable service,
+      // not an unhandled 500 on every route.
+      return new Response("Service unavailable", { status: 503 });
+    }
     const url = new URL(request.url);
 
     if (url.pathname === "/ws") {
@@ -171,6 +239,16 @@ export default {
 };
 
 async function handleUpgrade(request: Request, env: Env, url: URL): Promise<Response> {
+  // The per-IP burst damper is a production edge concern; local/staging test
+  // harnesses legitimately open tens of thousands of sockets from one loopback
+  // address, and the Room DO's per-user caps are the authoritative limit.
+  if (
+    env.APP_ENV === "production" &&
+    !allowUpgradeFromIp(request.headers.get("cf-connecting-ip"))
+  ) {
+    return new Response("Too Many Requests", { status: 429 });
+  }
+
   const room = url.searchParams.get("room");
   if (!room) {
     return new Response("Missing room", { status: 400 });
@@ -361,6 +439,7 @@ async function handleRevoke(request: Request, env: Env): Promise<Response> {
     sid?: unknown;
     exceptSid?: unknown;
     all?: unknown;
+    communityId?: unknown;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -372,8 +451,18 @@ async function handleRevoke(request: Request, env: Env): Promise<Response> {
   const sid = typeof body?.sid === "string" ? body.sid : undefined;
   const exceptSid = typeof body?.exceptSid === "string" ? body.exceptSid : undefined;
   const all = body?.all === true;
+  const communityId =
+    typeof body?.communityId === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      body.communityId,
+    )
+      ? body.communityId
+      : undefined;
+  if (body?.communityId !== undefined && !communityId) {
+    return new Response("Bad request", { status: 400 });
+  }
 
-  if (!userId || (!all && !sid && !exceptSid)) {
+  if (!userId || (!all && !sid && !exceptSid && !communityId)) {
     return new Response("Bad request", { status: 400 });
   }
 
@@ -386,7 +475,7 @@ async function handleRevoke(request: Request, env: Env): Promise<Response> {
         "x-realtime-publish-secret": env.REALTIME_PUBLISH_SECRET,
         "x-realtime-uid": userId,
       },
-      body: JSON.stringify({ userId, sid, exceptSid, all }),
+      body: JSON.stringify({ userId, sid, exceptSid, all, communityId }),
       signal: AbortSignal.timeout(10_000),
     });
     return new Response(await response.text(), {

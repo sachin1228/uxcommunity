@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { cleanupCommunityMedia, collectCommunityMediaUrls } from "@/lib/r2-cleanup";
+import { attemptMembershipRevocationNow } from "@/lib/realtime/membership-revocation-queue";
 import { cleanDesignation } from "@/lib/communities/comment-authors";
 import { loadCommunityManagerStatus } from "@/lib/communities/manager-role";
 import { NO_COMMUNITY_PERMISSIONS, type CommunityPermissions } from "@/lib/communities/permissions";
@@ -223,26 +224,37 @@ export async function DELETE(
         console.error("[leave community] R2 cleanup error:", cleanupError);
       }
 
+      await attemptMembershipRevocationNow(userId, communityId);
+
       return NextResponse.json({ success: true, community_deleted: true });
     }
   }
 
-  // 3. Remove membership (plus any admin permission grants)
-  await db
-    .from("community_admin_permissions")
-    .delete()
-    .eq("community_id", communityId)
-    .eq("user_id", userId);
+  // 3. Delete the membership/grant rows and write the durable revocation row
+  // atomically, so a crash cannot lose the realtime close.
+  const { data: removed, error: removeError } = await db.rpc(
+    "remove_community_member_with_revocation",
+    {
+      p_community_id: communityId,
+      p_user_id: userId,
+    },
+  );
 
-  const { error } = await db
-    .from("community_members")
-    .delete()
-    .eq("community_id", communityId)
-    .eq("user_id", userId);
-
-  if (error) {
+  if (removeError) {
+    console.error("[leave community] atomic removal failed:", removeError);
     return NextResponse.json({ error: "Failed to leave community." }, { status: 500 });
   }
+  if (removed !== true) {
+    // A retry after a lost response, or a concurrent leave, has already
+    // achieved the requested state. The queue row from that removal is
+    // already durable; an immediate close is still safe and idempotent.
+    await attemptMembershipRevocationNow(userId, communityId);
+    return NextResponse.json({ success: true, already_left: true });
+  }
+
+  // The membership row is gone; try the immediate close now. If realtime is
+  // down, the queued row is drained by the minute cron instead.
+  await attemptMembershipRevocationNow(userId, communityId);
 
   // 4. For private communities, clean up join request history so user must request again
   if (community.is_private) {
