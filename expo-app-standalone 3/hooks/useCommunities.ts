@@ -45,6 +45,7 @@ import { communityStore } from '@/lib/communityStore';
 import { bubbleToTop, expiredPinIds, sortByLastActivity } from '@/lib/sidebarOrder';
 import { mergeContentActivity } from '@/lib/sidebarMerge';
 import { scheduleMarkRead } from '@/lib/readManager';
+import { applyCommunityReadFloor } from '@/lib/communityReadFloor';
 import { patchCachedBootstrapContentEvents } from '@/lib/communityBootstrap';
 import { subscribeContentEvents } from '@/lib/contentEventMirror';
 import { apiFetch } from '@/lib/api';
@@ -87,7 +88,9 @@ export function useCommunities() {
   const userId = user?.id ?? null;
   const cached = useRef(peekCommunitiesSnapshot()).current;
   const [communities, setCommunities] = useState<Community[]>(() =>
-    cached ? sortByLastActivity(cached) : [],
+    cached
+      ? sortByLastActivity(cached.map((row) => applyCommunityReadFloor(userId, row)))
+      : [],
   );
   const [isLoading, setIsLoading] = useState(cached === null);
   const [error, setError] = useState<string | null>(null);
@@ -154,7 +157,9 @@ export function useCommunities() {
       if (userIdRef.current !== userId) return;
       lastListFetchRef.current = Date.now();
       loadedForUserRef.current = userId;
-      setCommunities(sortByLastActivity(data));
+      setCommunities(
+        sortByLastActivity(data.map((row) => applyCommunityReadFloor(userId, row))),
+      );
       setError(null);
     } catch (e) {
       if (userIdRef.current !== userId) return;
@@ -179,7 +184,10 @@ export function useCommunities() {
       setCommunities((prev) => {
         const prevMap = new Map(prev.map((c) => [c.id, c]));
         const activeId = communityStore.activeCommunityId;
-        const merged = fresh.map((server) => {
+        // A payload produced before this chat's read marker advanced must not
+        // resurrect the badge the open already cleared.
+        const merged = fresh.map((raw) => {
+          const server = applyCommunityReadFloor(userId, raw);
           const local = prevMap.get(server.id);
           if (!local) return server;
           // The server snapshot is authoritative about what still exists. Keep
@@ -735,7 +743,9 @@ export function useCommunities() {
     let active = true;
     void chatCache.loadCommunityList(userId).then((rows) => {
       if (!active || !rows || rows.length === 0) return;
-      const sorted = sortByLastActivity(rows);
+      const sorted = sortByLastActivity(
+        rows.map((row) => applyCommunityReadFloor(userId, row)),
+      );
       loadedForUserRef.current = userId;
       // The auth provider hydrates the shared snapshot in parallel; seed what
       // it may not have reached yet, but never replace a live network page.
@@ -851,6 +861,35 @@ export function useCommunities() {
     return () => clearInterval(timer);
   }, []);
 
+  /**
+   * Zero one row's badges locally and re-sum the app icon. The server total
+   * replaces this sum once the read is acknowledged; until then the icon must
+   * not keep a count the member has just read away.
+   */
+  const zeroCommunityUnread = useCallback((communityId: string) => {
+    setCommunities((prev) =>
+      prev.map((c) =>
+        c.id === communityId
+          ? { ...c, unread_count: 0, unread_content_count: 0 }
+          : c,
+      )
+    );
+
+    const rows = communitiesRef.current;
+    // Nothing loaded yet means nothing to re-sum: keep the icon as it was
+    // rather than reporting a total that is only missing its rows.
+    if (rows.length === 0) return;
+    const remaining = rows.reduce(
+      (sum, c) =>
+        sum +
+        (c.id === communityId
+          ? 0
+          : (c.unread_count ?? 0) + (c.unread_content_count ?? 0)),
+      0
+    );
+    void setAppBadgeCountAsync(remaining);
+  }, []);
+
   // The chat screen and the create flow patch the list through the shared
   // store — muting, "Delete chat" (archive), "Exit community" (remove) and a
   // brand-new community (refresh) all happen elsewhere, and the list must
@@ -866,13 +905,21 @@ export function useCommunities() {
           setCommunities((prev) => prev.filter((c) => c.id !== change.communityId));
           return;
         }
+        if (change.kind === 'read') {
+          // A chat opened from outside the list (a push, the notifications
+          // page, a deep link) clears its row the moment it is on screen —
+          // waiting for the read PATCH left the badge up for seconds after
+          // the member was back.
+          zeroCommunityUnread(change.communityId);
+          return;
+        }
         setCommunities((prev) =>
           sortByLastActivity(
             prev.map((c) => (c.id === change.communityId ? { ...c, ...change.patch } : c)),
           ),
         );
       }),
-    [load],
+    [load, zeroCommunityUnread],
   );
 
   // Content created or deleted from the community's own tabs mirrors into the
@@ -940,32 +987,10 @@ export function useCommunities() {
   /**
    * Call on entering a community chat.
    * Zeros badge locally, persists to server, guards realtime increment.
-   *
-   * The app icon badge is re-summed here too: opening a chat is the moment
-   * the unread total changes, and leaving the old number on the icon until
-   * the next push would be visibly wrong. The local sum is applied first so
-   * the icon moves immediately, then the server total replaces it once the
-   * read has actually been persisted.
    */
   const markCommunityRead = useCallback((communityId: string) => {
     communityStore.activeCommunityId = communityId;
-    setCommunities((prev) =>
-      prev.map((c) =>
-        c.id === communityId
-          ? { ...c, unread_count: 0, unread_content_count: 0 }
-          : c,
-      )
-    );
-
-    const remaining = communitiesRef.current.reduce(
-      (sum, c) =>
-        sum +
-        (c.id === communityId
-          ? 0
-          : (c.unread_count ?? 0) + (c.unread_content_count ?? 0)),
-      0
-    );
-    void setAppBadgeCountAsync(remaining);
+    zeroCommunityUnread(communityId);
 
     // Route through the shared read manager: the chat's own open-time mark
     // then sees this PATCH and skips the duplicate. The badge refresh follows
@@ -977,7 +1002,7 @@ export function useCommunities() {
         await syncBadgeFromServer();
       },
     });
-  }, []);
+  }, [zeroCommunityUnread]);
 
   /** Call on leaving a community chat (unmount). */
   const clearActiveCommunity = useCallback(() => {

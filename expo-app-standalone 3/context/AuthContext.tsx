@@ -60,6 +60,7 @@ import {
 import { queryClient } from '@/lib/queryClient';
 import { activateScreenDataSession, clearScreenDataForUser } from '@/lib/screenDataCacheStore';
 import { resetReadManager } from '@/lib/readManager';
+import { resetCommunityReadFloors } from '@/lib/communityReadFloor';
 import {
   resetRealtimeSession,
   subscribeRealtimeSessionRevoked,
@@ -172,7 +173,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           clearDmConversationsCache();
         },
         resetReads: () => {
-          if (isCurrent()) resetReadManager();
+          if (isCurrent()) {
+            resetReadManager();
+            resetCommunityReadFloors();
+          }
         },
         clearSnapshot: async () => {
           if (isCurrent()) await AsyncStorage.removeItem(AUTH_USER_STORAGE_KEY);
@@ -204,7 +208,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         clearDmConversationsCache();
       },
       resetReads: () => {
-        if (isCurrent()) resetReadManager();
+        if (isCurrent()) {
+          resetReadManager();
+          resetCommunityReadFloors();
+        }
       },
       clearSnapshot: async () => {
         if (isCurrent()) await AsyncStorage.removeItem(AUTH_USER_STORAGE_KEY);

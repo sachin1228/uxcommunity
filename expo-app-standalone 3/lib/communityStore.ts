@@ -30,6 +30,8 @@ export type CommunityRowPatch = Partial<
 export type CommunityChange =
   /** Patch one row in place (mute state, archive). */
   | { kind: 'patch'; communityId: string; patch: CommunityRowPatch }
+  /** A chat was opened — clear its unread badges without a server round trip. */
+  | { kind: 'read'; communityId: string }
   /** Drop the row entirely (Exit community). */
   | { kind: 'remove'; communityId: string }
   /** The list itself is stale (a community was just created) — re-read. */

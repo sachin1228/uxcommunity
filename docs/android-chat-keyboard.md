@@ -14,6 +14,13 @@ runtime. A native scroll inset reserves the occupied keyboard/emoji-panel area:
   the decision halfway through an animation.
 - Keyboard and emoji handoffs share `max(imeInset, panelExtent)`. Their heights
   are never added together.
+- A dismiss grows the viewport without resizing the list (the list's Yoga size
+  never changes). Both chat lists disable Android's native
+  `removeClippedSubviews`: on a scaleY-flipped list behind the keyboard inset
+  its clipping bounds go stale, so cells beyond the first screen stay detached
+  after the keyboard hands the space back — a blank gap above the newest
+  messages until the reader drags. The lists still virtualize by window; they
+  just keep the mounted window's native views attached.
 
 Previously, `listSpacerStyle.height` included the animated keyboard extent.
 Every IME frame therefore resized the FlatList through Yoga, and the inverted

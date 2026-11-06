@@ -499,3 +499,21 @@ export function compareChatTimeline(
   if (byTime !== 0) return byTime;
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
+
+/**
+ * The newest real (server-stamped) row's created_at — what an open chat has
+ * actually had in front of it. Optimistic rows carry the sending device's
+ * clock, so they are never a read watermark.
+ */
+export function newestMessageAt(
+  messages: readonly { id: string; created_at: string }[] | null | undefined,
+): string | null {
+  if (!messages?.length) return null;
+  return messages.reduce<string | null>(
+    (newest, message) =>
+      message.id.startsWith('temp-') || (newest && message.created_at <= newest)
+        ? newest
+        : message.created_at,
+    null,
+  );
+}
