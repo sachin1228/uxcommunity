@@ -14,9 +14,10 @@ import {
   Reaction,
 } from '@/lib/communities';
 import { scheduleMarkRead } from '@/lib/readManager';
+import { recordCommunityReadFloor } from '@/lib/communityReadFloor';
 import { communityMessageStore } from '@/lib/communityMessageStoreRuntime';
 import { enrichMessagePreviews } from '@/lib/communityMessageStore';
-import { pickOptimisticMatch, compareChatTimeline } from '@/lib/chat';
+import { pickOptimisticMatch, compareChatTimeline, newestMessageAt } from '@/lib/chat';
 import { warmChatMedia } from '@/lib/chatMediaPrefetch';
 import type { ChatContentKind } from '@/lib/chatContentEvents';
 import {
@@ -192,6 +193,12 @@ export function useChatMessages(communityId: string) {
     if (!owner) return;
     const current = () => communityIdRef.current === communityId && userIdRef.current === owner;
     setError(null);
+    // Opening the chat is reading it: the server marker is scheduled now, not
+    // after the message sync — a slow or failed sync must not leave the room
+    // unread for the next list read.
+    scheduleMarkRead(communityId, {
+      bypassCooldown: true, skipIfUpdatedWithinMs: 10_000, patch: markRead,
+    });
     try {
       await communityMessageStore.hydrate(owner, communityId);
       if (!current()) return;
@@ -203,9 +210,7 @@ export function useChatMessages(communityId: string) {
       if (!current()) return;
       const latest = communityMessageStore.peek(owner, communityId);
       setHasMore(latest?.hasMore ?? true);
-      scheduleMarkRead(communityId, {
-        bypassCooldown: true, skipIfUpdatedWithinMs: 10_000, patch: markRead,
-      });
+      recordCommunityReadFloor(owner, communityId, newestMessageAt(latest?.messages));
     } catch (failure) {
       if (current()) setError(failure instanceof Error ? failure.message : 'Failed to load messages');
     } finally {
@@ -395,6 +400,9 @@ export function useChatMessages(communityId: string) {
           // Debounced + cooldown-gated (lib/readManager): a busy room must not
           // PATCH /read once per incoming message.
           scheduleMarkRead(communityId, { patch: markRead });
+          // The row is on screen in the open chat; the list must not re-count
+          // it as unread if the PATCH is still inside its cooldown.
+          recordCommunityReadFloor(user.id, communityId, row.created_at);
         }
       }),
     );

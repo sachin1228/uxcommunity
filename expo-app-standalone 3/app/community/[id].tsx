@@ -61,6 +61,7 @@ import { communityNameBadges } from '@/lib/communityBadges';
 import {
   fmtDate,
   myReactionEmoji,
+  newestMessageAt,
   nextReactionIntent,
   projectOwnReaction,
   type MessageMention,
@@ -76,6 +77,11 @@ import {
 import { useSendMessage } from '@/hooks/useSendMessage';
 import { hapticSelection, hapticToggle } from '@/lib/haptics';
 import { communityStore, type CommunityRowPatch } from '@/lib/communityStore';
+import {
+  communityRowActivityAt,
+  recordCommunityReadFloor,
+} from '@/lib/communityReadFloor';
+import { communityMessageStore } from '@/lib/communityMessageStoreRuntime';
 import { setActiveCommunityForNotifications } from '@/lib/chatNotificationState';
 import { loadCommunityDetail } from '@/lib/communityDetailCache';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -362,6 +368,28 @@ export default function CommunityChat() {
       setActiveCommunityForNotifications(null);
     };
   }, [id]);
+
+  /**
+   * Opening the chat is reading it — whichever route got here. A row tap
+   * already cleared the list; a push, a notification link or a deep link did
+   * not, and the badge then waited seconds for the read PATCH and a list
+   * read. Clear the row now, and floor the list read at everything this
+   * screen already had (the cached window, the row it was opened from) so a
+   * payload produced before the PATCH cannot bring the badge back.
+   */
+  useEffect(() => {
+    if (!user?.id) return;
+    const cached = communityMessageStore.peek(user.id, id);
+    recordCommunityReadFloor(user.id, id, newestMessageAt(cached?.messages));
+    communityStore.notifyCommunityChanged({ kind: 'read', communityId: id });
+  }, [id, user?.id]);
+
+  // The community row can land a beat after a push deep link; its timestamps
+  // extend the floor to the activity that was on screen at open.
+  useEffect(() => {
+    if (!user?.id || !resolved) return;
+    recordCommunityReadFloor(user.id, id, communityRowActivityAt(resolved));
+  }, [id, user?.id, resolved]);
 
   const {
     messages,

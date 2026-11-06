@@ -32,6 +32,10 @@ import {
   setCommunityMute,
 } from '@/lib/communities';
 import { communityStore } from '@/lib/communityStore';
+import {
+  communityRowActivityAt,
+  recordCommunityReadFloor,
+} from '@/lib/communityReadFloor';
 import { planSelectionMute } from '@/lib/communityMute';
 import { hapticImpact, hapticSelection } from '@/lib/haptics';
 import { useAuth } from '@/context/AuthContext';
@@ -424,6 +428,14 @@ export default function CommunitiesScreen() {
   const handleCommunityPress = useCallback(
     (community: Community) => {
       prefetchCommunityMessages(user?.id, community.id);
+      // The open covers every message and card this row already shows; a list
+      // payload produced before the read PATCH lands must not bring the badge
+      // back (see lib/communityReadFloor).
+      recordCommunityReadFloor(
+        user?.id,
+        community.id,
+        communityRowActivityAt(community),
+      );
       markCommunityRead(community.id);
       const imageParam = community.image_url
         ? `&image=${encodeURIComponent(community.image_url)}`
