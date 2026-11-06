@@ -270,12 +270,20 @@ export function DmThread({
       {/* Message body — paper + scroller share one grid cell, like the
           community chat; the footer below is a plain flex sibling. */}
       <div className="relative grid min-h-0 flex-1 grid-rows-1 overflow-hidden">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-background" />
+        {/* Same doodle wallpaper as the community chat, masked down so the
+            conversation stays the loudest thing on the screen. */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-background"
+          className="pointer-events-none absolute inset-0 opacity-[0.055]"
           style={{
-            backgroundImage: "radial-gradient(circle,rgba(255,255,255,0.03) 1px,transparent 1px)",
-            backgroundSize: "24px 24px",
+            backgroundColor: "var(--color-foreground)",
+            WebkitMaskImage: "url(/chat-doodle.svg)",
+            WebkitMaskSize: "374px 666px",
+            WebkitMaskRepeat: "repeat",
+            maskImage: "url(/chat-doodle.svg)",
+            maskSize: "374px 666px",
+            maskRepeat: "repeat",
           }}
         />
         <div

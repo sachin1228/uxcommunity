@@ -155,18 +155,12 @@ export default function CommunityPageLoading() {
         />
 
         {showChatLoading ? (
-        /* Chat message area — mirrors the real chat layout: dotted scroll
-            background with the community Lottie, and the input box pinned to
-            the bottom. Only the Lottie is "loading"; everything else looks
+        /* Chat message area — mirrors the real chat layout: plain scroll
+            background with the spinner, and the input box pinned to the
+            bottom. Only the message list is "loading"; everything else looks
             exactly like the committed page. */
         <div className="flex-1 overflow-hidden relative">
-          <div
-            className="absolute inset-0 overflow-y-auto bg-background pb-24"
-            style={{
-              backgroundImage: "radial-gradient(circle,rgba(255,255,255,0.03) 1px,transparent 1px)",
-              backgroundSize: "24px 24px",
-            }}
-          >
+          <div className="absolute inset-0 overflow-y-auto bg-background pb-24">
             <div
               className="flex h-full items-center justify-center"
               role="status"

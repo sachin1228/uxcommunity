@@ -1102,12 +1102,20 @@ export function CommunityChat({
               scroller above it is transparent); the footer below is a plain
               flex sibling. */}
           <div className="relative grid grid-rows-1 flex-1 min-h-0 overflow-hidden">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-background" />
+          {/* Doodle wallpaper — the supplied line-art tile, tinted by the theme
+              and masked down to a whisper so bubbles stay the loudest thing. */}
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 bg-background"
+            className="pointer-events-none absolute inset-0 opacity-[0.055]"
             style={{
-              backgroundImage: "radial-gradient(circle,rgba(255,255,255,0.03) 1px,transparent 1px)",
-              backgroundSize: "24px 24px",
+              backgroundColor: "var(--color-foreground)",
+              WebkitMaskImage: "url(/chat-doodle.svg)",
+              WebkitMaskSize: "374px 666px",
+              WebkitMaskRepeat: "repeat",
+              maskImage: "url(/chat-doodle.svg)",
+              maskSize: "374px 666px",
+              maskRepeat: "repeat",
             }}
           />
           {isEventRoom && roomHasContent && !eventOver && (
