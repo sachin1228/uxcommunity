@@ -31,6 +31,7 @@ import { ChatInput, ChatComposerHandle, PendingImage } from '@/components/chat/C
 import { ChatScrollView } from '@/components/chat/ChatScrollView';
 import { EmojiPicker } from '@/components/chat/EmojiPicker';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
+import { ChatDoodleBackground } from '@/components/chat/ChatDoodleBackground';
 import { MessageActionsSheet } from '@/components/chat/MessageActionsSheet';
 import { EditMessageModal } from '@/components/chat/EditMessageModal';
 import { DisappearingNotice } from '@/components/chat/DisappearingNotice';
@@ -1299,6 +1300,7 @@ export default function CommunityChat() {
 
   const chatContent = (
     <View style={styles.flex}>
+      <ChatDoodleBackground />
       {toast && (
         <View style={[styles.toast, { backgroundColor: colors.foreground }]}>
           {toast.icon === 'check' && (

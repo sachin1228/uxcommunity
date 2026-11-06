@@ -34,6 +34,7 @@ import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
 import { ChatInput } from "./chat/ChatInput";
 import { MessageList } from "./chat/MessageList";
 import { ChatWatermark } from "./chat/ChatWatermark";
+import { ChatDoodle } from "./chat/ChatDoodle";
 import { ImageLightbox, type LightboxImage } from "./chat/ImageLightbox";
 import { MessageEditModal } from "./chat/MessageEditModal";
 import { TypingIndicator } from "./chat/TypingIndicator";
@@ -1105,11 +1106,8 @@ export function CommunityChat({
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 bg-background"
-            style={{
-              backgroundImage: "radial-gradient(circle,rgba(255,255,255,0.03) 1px,transparent 1px)",
-              backgroundSize: "24px 24px",
-            }}
           />
+          <ChatDoodle />
           {isEventRoom && roomHasContent && !eventOver && (
             <ChatWatermark text={displayCommunity?.name ?? ""} />
           )}

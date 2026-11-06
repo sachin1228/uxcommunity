@@ -10,6 +10,7 @@ import { PendingButton } from "@/components/ui/PendingButton";
 import { MessageEditModal } from "@/components/communities/chat/MessageEditModal";
 import { TypingIndicator } from "@/components/communities/chat/TypingIndicator";
 import { ChatInput } from "@/components/communities/chat/ChatInput";
+import { ChatDoodle } from "@/components/communities/chat/ChatDoodle";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
 import { profileHref } from "@/lib/profile/links";
 import { DmMessageList } from "./DmMessageList";
@@ -273,11 +274,8 @@ export function DmThread({
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 bg-background"
-          style={{
-            backgroundImage: "radial-gradient(circle,rgba(255,255,255,0.03) 1px,transparent 1px)",
-            backgroundSize: "24px 24px",
-          }}
         />
+        <ChatDoodle />
         <div
           ref={scrollContainerRef}
           data-chat-scroll-container

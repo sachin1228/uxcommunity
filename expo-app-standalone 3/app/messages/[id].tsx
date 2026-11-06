@@ -38,6 +38,7 @@ import { MessageBubble } from '@/components/chat/MessageBubble';
 import { createMessageVisibilityStore } from '@/lib/messageVisibility';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
+import { ChatDoodleBackground } from '@/components/chat/ChatDoodleBackground';
 import { DmComposer } from '@/components/dm/DmComposer';
 import { EmojiPicker } from '@/components/chat/EmojiPicker';
 import { ChatScrollView } from '@/components/chat/ChatScrollView';
@@ -1558,6 +1559,7 @@ export default function DmThreadScreen() {
         <>
           <View style={styles.flex}>
             <View style={styles.flex}>
+              <ChatDoodleBackground />
               <FlatList
                 ref={listRef}
                 inverted
