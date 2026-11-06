@@ -45,9 +45,15 @@ before(async () => {
 function setup() {
   const state: State = {
     showcaseSupported: true,
-    membership: { data: { last_read_at: "2026-11-01T00:00:00Z" } },
+    membership: { data: {
+      last_read_at: "2026-11-01T00:00:00Z",
+      role: "member",
+      notifications_muted: true,
+      notifications_muted_until: null,
+    } },
     community: { data: { id: "room", name: "Designers", type: "city", reference_id: "city", image_url: null,
-      is_private: true, enabled_tabs: ["chat"], showcase_enabled: false } },
+      is_private: true, enabled_tabs: ["chat"], showcase_enabled: false,
+      member_count: 42, owner_id: "owner-1" } },
     queries: [], dpCalls: 0,
     db: { from(table) {
       assert.ok(table === "community_members" || table === "communities", `Secondary table on critical path: ${table}`);
@@ -71,14 +77,30 @@ test("critical snapshot validates membership and active community without second
   if (!result.ok) return;
   assert.deepEqual(result.data, {
     community: { id: "room", name: "Designers", type: "city", image_url: "resolved-image", is_private: true,
-      enabled_tabs: ["chat"], showcase_enabled: false, member_count: 0, details_loaded: false },
+      enabled_tabs: ["chat"], showcase_enabled: false, member_count: 42, owner_id: "owner-1",
+      current_user_role: "member", notifications_muted: true, notifications_muted_until: null,
+      details_loaded: false },
     members: [], lastReadAt: "2026-11-01T00:00:00Z",
   });
   assert.equal(state.queries.length, 2);
-  assert.deepEqual(state.queries[0], { table: "community_members", columns: "last_read_at",
-    filters: [["community_id", "room"], ["user_id", "viewer"]] });
+  assert.deepEqual(state.queries[0], {
+    table: "community_members",
+    columns: "last_read_at, role, notifications_muted, notifications_muted_until",
+    filters: [["community_id", "room"], ["user_id", "viewer"]],
+  });
   assert.deepEqual(state.queries[1].filters, [["id", "room"], ["is_active", true]]);
-  assert.doesNotMatch(state.queries[1].columns!, /description|member_count|invite_token|owner_id/);
+  assert.doesNotMatch(state.queries[1].columns!, /description|invite_token|current_user_permissions/);
+});
+
+test("the same two rows resolve the owner role", async () => {
+  const state = setup();
+  state.community.data!.owner_id = "viewer";
+  const result = await load("room", "viewer");
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.data.community.current_user_role, "owner");
+  assert.equal(result.data.community.member_count, 42);
+  assert.equal(state.queries.length, 2, "the owner role comes from the community row, not a second read");
 });
 
 test("critical snapshot refuses non-members and inactive or missing communities", async () => {
@@ -88,7 +110,7 @@ test("critical snapshot refuses non-members and inactive or missing communities"
   assert.equal(denied.ok, false);
   if (!denied.ok) assert.equal(denied.status, 403);
   assert.equal(state.dpCalls, 0);
-  state.membership = { data: { last_read_at: null } };
+  state.membership = { data: { last_read_at: null, role: "member", notifications_muted: false, notifications_muted_until: null } };
   state.community = { data: null };
   const missing = await load("room", "viewer");
   assert.equal(missing.ok, false);

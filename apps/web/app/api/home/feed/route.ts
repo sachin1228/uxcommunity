@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth/session";
 import type { Json } from "@/lib/supabase/performance-rpcs";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { HOME_FEED_SCOPES, type HomeFeedScope } from "@/lib/feeds/home-feed-options";
+import { parseHomeFeedCursor } from "@/lib/feeds/home-feed-cursor";
 import { loadHomeFeedPage } from "@/lib/home/home-feed-server";
 
 export const dynamic = "force-dynamic";
@@ -19,8 +20,11 @@ export async function GET(req: NextRequest) {
     return error as Response;
   }
 
-  const before = req.nextUrl.searchParams.get("before");
-  if (before && Number.isNaN(Date.parse(before))) {
+  const cursor = parseHomeFeedCursor(
+    req.nextUrl.searchParams.get("before"),
+    req.nextUrl.searchParams.get("before_id"),
+  );
+  if (!cursor.ok) {
     timer.finish({ status: 400 });
     return NextResponse.json(
       { error: "Invalid feed cursor." },
@@ -40,7 +44,7 @@ export async function GET(req: NextRequest) {
   let items: Json[];
   try {
     items = await timer.measure("feed_page_rpc", () =>
-      loadHomeFeedPage(session.userId!, before, scope),
+      loadHomeFeedPage(session.userId!, cursor.before, cursor.beforeId, scope),
     );
   } catch (error) {
     console.error("[GET home feed]", error);

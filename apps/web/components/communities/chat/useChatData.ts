@@ -510,9 +510,10 @@ export function useChatData({
       if (!cancelled) {
         setLoading(false);
         setInitialMessagesReady(true);
-        // Populate About, member previews and controls after the first paint.
-        // A slow/failed details request cannot keep messages on the spinner.
-        void fetchMeta().catch(() => undefined);
+        // The header snapshot already carries the member count, role and mute
+        // state. About, member previews and grants load on demand (the header
+        // controls call fetchMeta), so opening a room costs one bootstrap
+        // request instead of bootstrap + a full read model on every visit.
       }
 
       // A network failure used to be swallowed and rendered as the "Be the

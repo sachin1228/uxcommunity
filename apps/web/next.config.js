@@ -6,7 +6,32 @@ const supabaseHostname = process.env.NEXT_PUBLIC_SUPABASE_URL
   ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
   : "*.supabase.co";
 
+// Public media base (R2 custom domain). Avatar/DP rendering opts into
+// next/image only for this origin (see apps/web/lib/images/remote-image.ts); the pattern
+// is derived from the same env the deploy sets, so no hostname is hardcoded.
+const r2PublicUrl = process.env.R2_PUBLIC_URL || process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "";
+let r2Pattern = null;
+if (r2PublicUrl) {
+  try {
+    const parsed = new URL(r2PublicUrl);
+    const basePath = parsed.pathname.replace(/\/+$/, "");
+    r2Pattern = {
+      protocol: parsed.protocol.replace(":", ""),
+      hostname: parsed.hostname,
+      ...(parsed.port ? { port: parsed.port } : {}),
+      pathname: `${basePath}/**`,
+    };
+  } catch {
+    // An unset/malformed optional media URL just disables the pattern.
+  }
+}
+
 const nextConfig = {
+  env: {
+    // Client components need to recognize eligible media URLs. The bucket URL
+    // is public media, never a credential.
+    NEXT_PUBLIC_R2_PUBLIC_URL: r2PublicUrl,
+  },
   // Video uploads ship the ORIGINAL to this route (cap: 50MB), so the Next
   // proxy's default 10MB body limit would truncate every big video. Match
   // the app cap with headroom for multipart/form-data overhead. In Next 16
@@ -109,12 +134,20 @@ const nextConfig = {
   },
   // Allow Next.js <Image> to optimise uploaded images from Supabase storage.
   images: {
+    // The isolated local stack serves media from 127.0.0.1. Next otherwise
+    // refuses to optimize any URL that resolves to a private IP; production
+    // media domains are public, so this never applies there.
+    ...(process.env.NODE_ENV !== "production" && r2Pattern
+      && ["127.0.0.1", "localhost"].includes(r2Pattern.hostname)
+      ? { dangerouslyAllowLocalIP: true }
+      : {}),
     remotePatterns: [
       {
         protocol: "https",
         hostname: supabaseHostname,
         pathname: "/storage/v1/object/public/**",
       },
+      ...(r2Pattern ? [r2Pattern] : []),
       // GIPHY CDN (for GIF and sticker messages)
       { protocol: "https", hostname: "media.giphy.com" },
       { protocol: "https", hostname: "media0.giphy.com" },

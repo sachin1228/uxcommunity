@@ -614,7 +614,7 @@ function useEventRsvpSender(
       const next = !rsvped;
       apply(next, Math.max(0, goingCount + (next ? 1 : -1)));
       try {
-        const result = await sendEventRsvp(event.community_id, event.id, answers);
+        const result = await sendEventRsvp(event.community_id, event.id, answers, next ? 'join' : 'leave');
         apply(result.value, result.count);
         if (result.chatCommunityId) {
           communityStore.notifyCommunityChanged({ kind: 'refresh' });

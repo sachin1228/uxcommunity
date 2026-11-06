@@ -855,10 +855,12 @@ export function CommunityChat({
     messages.length > 0 || threadEvents.length > 0 || contentEvents.length > 0;
 
   const detailsReady = !!community && community.details_loaded !== false;
-  const isOwner = detailsReady && community.owner_id === currentUserId;
-  // Role and grants only exist on the loaded read model; the sidebar fallback
-  // never carries them, so read them from `community` directly.
-  const myRole = detailsReady ? community.current_user_role ?? (isOwner ? "owner" : null) : null;
+  // The bootstrap header snapshot carries the caller's role and owner id, so
+  // the header is complete before the deferred details read. Grants still live
+  // only on the full model (managers load it below); members never need it for
+  // ordinary chat.
+  const isOwner = !!community && community.owner_id === currentUserId;
+  const myRole = community?.current_user_role ?? (isOwner ? "owner" : null);
   const myPerms = detailsReady ? community.current_user_permissions : undefined;
   // The manager tier that appoints moderators and audits manager activity: the
   // owner of a member-created community, or the platform-appointed admin of an
@@ -917,7 +919,15 @@ export function CommunityChat({
     setShowSettings(false);
     handleTabChange(tab);
   }, [handleTabChange]);
-  const handleSettingsClick = useCallback(() => setShowSettings(true), []);
+  const handleSettingsClick = useCallback(() => {
+    if (detailsReady) {
+      setShowSettings(true);
+      return;
+    }
+    // The settings form edits fields that only the full read model carries, so
+    // fetch it first instead of opening a half-filled form.
+    void fetchMeta().then(() => setShowSettings(true)).catch(() => undefined);
+  }, [detailsReady, fetchMeta]);
 
   // A mute save is durable server-side, but every client cache still holds
   // the pre-mute membership — patch the header's meta, its request cache and
@@ -946,8 +956,28 @@ export function CommunityChat({
   // registry in lib/communities/cache rather than by routing: this view owns
   // the modal, and it is simply not mounted where the request is not ours.
   useEffect(() => {
-    return registerCommunitySettingsOpener(communityId, () => setShowSettings(true));
-  }, [communityId]);
+    return registerCommunitySettingsOpener(communityId, handleSettingsClick);
+  }, [communityId, handleSettingsClick]);
+
+  // Leaving Chat means the content tabs, Members or Activity: they render
+  // management data and member previews from the full read model, so load it
+  // when one is opened. Chat itself stays on the two-row snapshot.
+  useEffect(() => {
+    if (renderedTab !== "chat" && community && community.details_loaded === false) {
+      void fetchMeta().catch(() => undefined);
+    }
+  }, [renderedTab, community, fetchMeta]);
+
+  // Managers keep their chat moderation controls (delete/hover menus) from the
+  // first paint, so their grants are worth the one extra read. An ordinary
+  // member never pays for it: their chat is exactly the two-row snapshot.
+  const needsManagerDetails =
+    !!community &&
+    community.details_loaded === false &&
+    (isOwner || myRole === "admin" || myRole === "moderator");
+  useEffect(() => {
+    if (needsManagerDetails) void fetchMeta().catch(() => undefined);
+  }, [needsManagerDetails, fetchMeta]);
 
   if (!loading && !displayCommunity) {
     return (

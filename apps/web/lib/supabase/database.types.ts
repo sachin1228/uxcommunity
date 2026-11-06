@@ -3635,6 +3635,18 @@ export type Database = {
             Returns: {
               item: Json;
             }[];
+          }
+        | {
+            Args: {
+              p_before: string | null;
+              p_before_id: string | null;
+              p_limit: number;
+              p_scope: string;
+              p_user_id: string;
+            };
+            Returns: {
+              item: Json;
+            }[];
           };
       get_or_create_dm_conversation: {
         Args: { p_me: string; p_peer: string };

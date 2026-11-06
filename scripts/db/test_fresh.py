@@ -96,8 +96,18 @@ def run(args):
         elif Path(status['identity']['project_root']).resolve() != work.resolve():
             raise RuntimeError('CLI returned a different stack; refusing database access')
         url = status['env']['DB_URL']
-        if urllib.parse.urlparse(url).hostname not in ('localhost', '127.0.0.1', '::1'):
+        parsed_url = urllib.parse.urlparse(url)
+        if parsed_url.hostname not in ('localhost', '127.0.0.1', '::1'):
             raise RuntimeError('Test target is not loopback')
+        # Connection assertions that need a second session (psql \!) inherit
+        # these disposable values instead of whatever the caller had.
+        env.update({
+            'PGHOST': parsed_url.hostname,
+            'PGPORT': str(parsed_url.port or 5432),
+            'PGUSER': urllib.parse.unquote(parsed_url.username or 'postgres'),
+            'PGPASSWORD': urllib.parse.unquote(parsed_url.password or ''),
+            'PGDATABASE': urllib.parse.unquote(parsed_url.path.lstrip('/') or 'postgres'),
+        })
         psql = ['psql', '-X', '-q', '-v', 'ON_ERROR_STOP=1', '--dbname', url]
 
         def query(sql):

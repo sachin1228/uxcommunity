@@ -375,7 +375,7 @@ export function EventCard({
   async function restoreRsvp(answers?: EventJoinAnswers) {
     const response = await dedupeFetch(
       `/api/communities/${communityId}/events/${event.id}/rsvp`,
-      { method: "POST", body: answers ? JSON.stringify({ answers }) : undefined, headers: answers ? { "Content-Type": "application/json" } : undefined },
+      { method: "POST", body: JSON.stringify({ answers, action: "join" }), headers: { "Content-Type": "application/json" } },
     );
     const data = await response.json().catch(() => null);
     if (!response.ok) throw new Error(data?.error ?? "Failed to RSVP.");
@@ -398,7 +398,7 @@ export function EventCard({
     try {
       const response = await dedupeFetch(
         `/api/communities/${communityId}/events/${event.id}/rsvp`,
-        { method: "POST", body: answers ? JSON.stringify({ answers }) : undefined, headers: answers ? { "Content-Type": "application/json" } : undefined },
+        { method: "POST", body: JSON.stringify({ answers, action: newRsvped ? "join" : "leave" }), headers: { "Content-Type": "application/json" } },
       );
       if (response.ok) {
         const data = await response.json();
@@ -430,7 +430,13 @@ export function EventCard({
       } else {
         const data = await response.json().catch(() => null);
         setRsvpError(data?.error ?? "Failed to RSVP.");
-        onRsvpChanged(event.id, event.user_rsvped, event.rsvp_count);
+        // A 409 carries the authoritative count (the event filled while this
+        // request was in flight) so the card stops offering a doomed action.
+        onRsvpChanged(
+          event.id,
+          event.user_rsvped,
+          typeof data?.rsvp_count === "number" ? data.rsvp_count : event.rsvp_count,
+        );
       }
     } catch {
       setRsvpError("Failed to RSVP.");

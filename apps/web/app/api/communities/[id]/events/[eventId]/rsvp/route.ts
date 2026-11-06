@@ -35,9 +35,22 @@ export async function POST(
   // web app always sends them; older clients may not). Recorded with the
   // membership below so the host reads them back in the members tab.
   const body = (await req.json().catch(() => null)) as
-    | { answers?: Record<string, unknown> }
+    | { answers?: Record<string, unknown>; action?: unknown }
     | null;
   const answers = joinAnswersPayload(body?.answers ?? {});
+  // New clients state their intent so a double-tap (or the undo toast) can
+  // never turn "join" into a toggle-off. Older clients omit it and keep the
+  // original toggle contract.
+  const requestedAction: "join" | "leave" | null =
+    body?.action === "join" || body?.action === "leave" ? body.action : null;
+
+  async function countRsvps(): Promise<number> {
+    const { count } = await db
+      .from("event_rsvps")
+      .select("event_id", { count: "exact", head: true })
+      .eq("event_id", eventId);
+    return count ?? 0;
+  }
 
   const access = await loadEventForViewer<{
     id: string;
@@ -68,24 +81,30 @@ export async function POST(
     return NextResponse.json({ error: "This event has ended." }, { status: 409 });
   }
 
-  // Check if already RSVPed
-  const { data: existing } = await db
-    .from("event_rsvps")
-    .select("event_id")
-    .eq("event_id", eventId)
-    .eq("user_id", userId)
-    .maybeSingle();
+  // Toggle requests still need to know which direction the caller means. An
+  // explicit `action` skips this read entirely.
+  const existing = requestedAction
+    ? null
+    : (await db
+        .from("event_rsvps")
+        .select("event_id")
+        .eq("event_id", eventId)
+        .eq("user_id", userId)
+        .maybeSingle()).data;
 
-  if (existing) {
-    // Toggle off — remove RSVP
-    const { error: deleteError } = await db
+  const leave = requestedAction === "leave" || (!requestedAction && Boolean(existing));
+
+  if (leave) {
+    const { data: removedRows, error: deleteError } = await db
       .from("event_rsvps")
       .delete()
       .eq("event_id", eventId)
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .select("event_id");
     if (deleteError) {
       return NextResponse.json({ error: "Failed to update RSVP. Please try again." }, { status: 500 });
     }
+    const removed = (removedRows?.length ?? 0) > 0;
 
     // Not going any more means leaving the event's group chat with the RSVP:
     // the room is for the people going. The creator keeps their own group.
@@ -107,41 +126,53 @@ export async function POST(
       console.error("[event RSVP] group chat leave failed:", error);
     }
 
-    void publishRealtimeBatch([
-      { room: realtimeRooms.events(communityId), topic: "rsvp", data: { event: "DELETE", event_id: eventId, user_id: userId } },
-    ]);
-    const { data: remaining } = await db.from("event_rsvps").select("event_id").eq("event_id", eventId);
+    if (removed) {
+      void publishRealtimeBatch([
+        { room: realtimeRooms.events(communityId), topic: "rsvp", data: { event: "DELETE", event_id: eventId, user_id: userId } },
+      ]);
+    }
     return NextResponse.json({
       rsvped: false,
-      rsvp_count: (remaining ?? []).length,
+      rsvp_count: await countRsvps(),
       // The client drops this room from the sidebar (the member just left it).
       chat_community_id: leftChatCommunityId,
     });
   }
 
-  // Check capacity
-  if (event.max_attendees) {
-    const { data: current } = await db.from("event_rsvps").select("event_id").eq("event_id", eventId);
-    if ((current ?? []).length >= event.max_attendees) {
-      return NextResponse.json({ error: "This event is full." }, { status: 409 });
+  // "Going" is idempotent: ON CONFLICT DO NOTHING means a double-tap, a retry
+  // after a lost response, or the undo toast can never flip the state. The
+  // capacity rule lives in the database trigger (20261106150000), which takes
+  // the event row lock and counts committed attendees — so concurrent requests
+  // cannot oversell, and a full event rejects this insert with P0001.
+  const { data: insertedRows, error: insertError } = await db
+    .from("event_rsvps")
+    .upsert(
+      { event_id: eventId, user_id: userId },
+      { onConflict: "event_id,user_id", ignoreDuplicates: true },
+    )
+    .select("event_id");
+
+  if (insertError) {
+    if (insertError.code === "P0001" && insertError.message.includes("EVENT_CAPACITY_REACHED")) {
+      return NextResponse.json(
+        { error: "This event is full.", rsvp_count: await countRsvps(), max_attendees: event.max_attendees },
+        { status: 409 },
+      );
+    }
+    // A database without the trigger yet can still surface the primary key.
+    if (insertError.code !== "23505") {
+      return NextResponse.json({ error: "Failed to RSVP. Please try again." }, { status: 500 });
     }
   }
-
-  // Surface insert failures: a silent failure here made the client show
-  // "Going ✓" while nothing was persisted, so the state reverted on refresh.
-  const { error: insertError } = await db
-    .from("event_rsvps")
-    .insert({ event_id: eventId, user_id: userId });
-  if (insertError) {
-    return NextResponse.json({ error: "Failed to RSVP. Please try again." }, { status: 500 });
-  }
+  const inserted = (insertedRows?.length ?? 0) > 0;
 
   // Confirming "I'm going" is also the door into the event's group chat: the
   // room is created on demand here (covering events that predate the group)
   // and the attendee is put in it, so the event's chat shows up in their
   // sidebar and everybody going can talk about it in one place. Membership
   // still follows the event's own visibility rule, so an RSVP can never be a
-  // way into a room its event does not open.
+  // way into a room its event does not open. This also repairs a missing chat
+  // membership on an idempotent re-join.
   let chatCommunityId: string | null = null;
   try {
     if (await canJoinEventChat(db, event, userId)) {
@@ -170,25 +201,26 @@ export async function POST(
     console.error("[event RSVP] group chat join failed:", error);
   }
 
-  void publishRealtimeBatch([
-    { room: realtimeRooms.events(communityId), topic: "rsvp", data: { event: "INSERT", event_id: eventId, user_id: userId } },
-  ]);
-  deferNotification({
-    userId: event.user_id,
-    actorId: userId,
-    communityId,
-    type: "event_rsvp",
-    entityType: "event",
-    entityId: eventId,
-    title: (actorName) => `${actorName} RSVPed to your event`,
-    body: event.title,
-    href: eventHref(communityId, eventId),
-  });
+  if (inserted) {
+    void publishRealtimeBatch([
+      { room: realtimeRooms.events(communityId), topic: "rsvp", data: { event: "INSERT", event_id: eventId, user_id: userId } },
+    ]);
+    deferNotification({
+      userId: event.user_id,
+      actorId: userId,
+      communityId,
+      type: "event_rsvp",
+      entityType: "event",
+      entityId: eventId,
+      title: (actorName) => `${actorName} RSVPed to your event`,
+      body: event.title,
+      href: eventHref(communityId, eventId),
+    });
+  }
 
-  const { data: all } = await db.from("event_rsvps").select("event_id").eq("event_id", eventId);
   return NextResponse.json({
     rsvped: true,
-    rsvp_count: (all ?? []).length,
+    rsvp_count: await countRsvps(),
     chat_community_id: chatCommunityId,
   });
 }

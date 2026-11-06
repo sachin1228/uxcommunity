@@ -18,6 +18,7 @@ import { FEED_PAGE_SIZE as PAGE_SIZE, isFeedCard, normalizeFeedCard, type FeedCa
 export async function loadHomeFeedPage(
   userId: string,
   before: string | null,
+  beforeId: string | null,
   scope: HomeFeedScope,
 ) {
   const db = createServiceClient();
@@ -27,6 +28,7 @@ export async function loadHomeFeedPage(
     {
       p_user_id: userId,
       p_before: before,
+      p_before_id: beforeId,
       p_limit: PAGE_SIZE,
       p_scope: scope,
     },

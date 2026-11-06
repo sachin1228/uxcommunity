@@ -14,6 +14,12 @@ interface DateGroup {
   messages: DmMessage[];
 }
 
+/** Same off-screen rendering rule as the community chat (see MessageList). */
+const OFFSCREEN_GROUP_STYLE = {
+  contentVisibility: "auto",
+  containIntrinsicSize: "auto 160px",
+} as React.CSSProperties;
+
 /**
  * The DM timeline: day-grouped bubbles reusing the community chat's exact
  * rendering (bubble, tail, reactions, jumbo emoji, tombstones, entrance
@@ -164,7 +170,7 @@ export const DmMessageList = memo(function DmMessageList({
       {grouped.map((group, groupIdx) => {
         const showDateDivider = groupIdx > 0 || !hasMoreAbove;
         return (
-          <div key={group.date}>
+          <div key={group.date} style={OFFSCREEN_GROUP_STYLE}>
             {showDateDivider && (
               <div className="flex items-center justify-center py-3 px-5">
                 <span className="font-body text-xs font-medium text-foreground-muted">
