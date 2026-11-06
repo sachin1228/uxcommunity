@@ -13,8 +13,8 @@
 
 | Area | Status | Summary |
 |---|---|---|
-| Realtime correctness tests in CI | **PASS** | A dedicated CI job runs the realtime Worker/Durable Object suites against local miniflare instances; no Cloudflare or production resource is contacted. Load-only suites moved to a manual workflow. GitHub Actions run `42197210602` passed in 5.0 minutes. |
-| Complete web suite before release | **PASS** | The full web typecheck, unit suite, mobile suites, comment/deployment audits and a Next build now run in CI. The production workflow calls that CI as a reusable workflow and cannot release without it. The web build passed in GitHub Actions in 1.9 minutes. |
+| Realtime correctness tests in CI | **PASS** | A dedicated CI job runs the realtime Worker/Durable Object suites against local miniflare instances; no Cloudflare or production resource is contacted. Load-only suites moved to a manual workflow. GitHub Actions run `42216357510` passed in 5 m 03 s. |
+| Complete web suite before release | **PASS** | The full web typecheck, unit suite, mobile suites, comment/deployment audits and a Next build now run in CI. The production workflow calls that CI as a reusable workflow and cannot release without it. The web build passed in GitHub Actions in 1 m 15 s. |
 | Exact-commit production gate | **PASS (structure), NOT VERIFIED end-to-end** | `deploy.yml` calls `ci.yml` as a reusable workflow on the same `github.sha`; the deploy job depends on it, pins checkout to that SHA, and refuses if `main` moved. No production deployment was triggered to prove it end-to-end. |
 | Android release signing | **PASS (fail-closed and local release), production key NOT VERIFIED** | Release tasks fail without upload-key credentials; debug stays on the debug key. A disposable verification keystore produced a release-signed APK with a release cert. The real production keystore is not available in this workspace and was not generated or replaced. |
 | Android versioning | **PARTIAL** | `app.json` is the single source (`versionCode: 1`, `versionName: 1.0.0`), EAS uses the same local source, and a bump script is documented. Monotonicity across releases remains process-enforced; no release ledger is stored remotely. |
@@ -85,7 +85,7 @@ Coverage includes the WebSocket connection lifecycle, `UserDO`/`CommunityDO` gat
 
 The three 500-client fan-out tests in `realtime.integration.test.ts` and the 500/1000-client cases in `ws-ownership.test.ts` are load tests. They are skipped in the PR gate and run in the manual **Realtime load tests** workflow with `REALTIME_LOAD_TESTS=1`. The 100-client scale case and the 300-socket presence-window case remain in CI.
 
-**Runtime:** the full correctness suite (including the load cases, before the split) took ~9 minutes on the development machine. The final CI subset took 229.86 s (3 m 50 s) locally and 5.0 minutes in GitHub Actions run `42197210602`.
+**Runtime:** the full correctness suite (including the load cases, before the split) took ~9 minutes on the development machine. The final CI subset took 225.62 s (3 m 46 s) locally and 5 m 03 s in GitHub Actions run `42216357510`.
 
 ---
 
@@ -268,9 +268,9 @@ Verified in the built APK: the manifest has `allowBackup="false"` and both rule 
 | `actionlint .github/workflows/*.yml` | **PASS structurally** — only two pre-existing shellcheck notes (`ci.yml` unit-test glob, `deploy.yml` pre-existing `export`). |
 | `npx yaml-lint` on changed workflows | **PASS** |
 | Intentional failing realtime test | **PASS (proof)** — a temporary `expect(1).toBe(2)` test made `vitest run` exit **1**; it was deleted immediately. The CI step runs the same command with no `continue-on-error`, so a red realtime test fails the job. |
-| GitHub Actions CI on PR #797 (previous commit `6fb6f761`, run `42197210602`) | **PASS** — all 9 jobs green: TypeScript 1.7 m, Unit tests 1.8 m, Realtime correctness 5.0 m, Web build 1.9 m, Mobile chat loading 1.1 m, Environment isolation 1.1 m, Comment audit 0.1 m, Deployment targets 0.1 m, ESLint advisory 1.5 m. |
+| GitHub Actions CI on PR #797 (final implementation commit `efcbd81e`, run `42216357510`) | **PASS** — all 9 jobs green: TypeScript 1 m 34 s, Unit tests 1 m 35 s, Realtime correctness 5 m 03 s, Web build 1 m 15 s, Mobile chat loading 45 s, Environment isolation 1 m 11 s, Comment audit 9 s, Deployment targets 8 s, ESLint advisory 1 m 31 s. |
 
-**Final realtime subset:** 23 files passed, 271 tests passed, 5 load-only tests skipped (3 in `realtime.integration.test.ts`, 2 in `ws-ownership.test.ts`), 0 failed in 225.62 s locally; the same job passed in GitHub Actions run `42197210602` in 5.0 minutes on the previous commit. The observed full-suite run before the split passed 272/276 with the same three skips and one 1000-client load case failing under simultaneous local Android/web builds — the reason the load cases were moved to the manual workflow. The local final run was executed with the committed CI fixture copied over `.dev.vars` and `APP_ENV=development`, matching the CI job.
+**Final realtime subset:** 23 files passed, 271 tests passed, 5 load-only tests skipped (3 in `realtime.integration.test.ts`, 2 in `ws-ownership.test.ts`), 0 failed in 225.62 s locally; the same job passed in GitHub Actions run `42216357510` in 5 m 03 s on the final implementation commit. The observed full-suite run before the split passed 272/276 with the same three skips and one 1000-client load case failing under simultaneous local Android/web builds — the reason the load cases were moved to the manual workflow. The local final run was executed with the committed CI fixture copied over `.dev.vars` and `APP_ENV=development`, matching the CI job.
 
 ---
 
@@ -298,7 +298,7 @@ Manual items:
 1. **Production signing certificate is not verified.** The real upload keystore is not available; only the fail-closed behavior and a disposable-key release build were verified.
 2. **`versionCode` monotonicity is process-enforced.** There is no remote release ledger; a skipped `version:bump` would repeat a code. The tooling and README make the correct step explicit.
 3. **The exact-SHA production gate was not exercised end-to-end.** No production dispatch was made, per the constraints. It is covered by static workflow assertions plus a disposable-git harness for the moved-main and wrong-checkout branches; GitHub's `needs` semantics provide the fail/cancel/skip blocking. This is not the same as a live production dispatch.
-4. **The new jobs have run green in GitHub Actions** (PR #797, run `42197210602`). The remaining unexercised path is the production deployment workflow itself, which was deliberately not triggered.
+4. **The new jobs have run green in GitHub Actions** (PR #797, final implementation commit `efcbd81e`, run `42216357510`). The remaining unexercised path is the production deployment workflow itself, which was deliberately not triggered.
 5. **ESLint remains advisory** because of pre-existing rule debt; it does not block a release. This is unchanged.
 6. **The CI web build adds time** to every PR (a full Next build). It is the build validation required by this stage; the deploy still performs its own OpenNext artifact build with production secrets.
 7. **EAS-managed signing was not exercised against the real Expo account.** The local plugin now keeps a post-evaluation guard active on EAS and the no-injection and simulated-injection paths were tested, but the actual EAS upload certificate, its fingerprint, and the Play Console comparison remain **NOT VERIFIED**. Use the manual steps in section 12 before an EAS release.
@@ -395,7 +395,21 @@ Edge cases documented: (1) if `main` moves **after** the guard but during the de
 
 ### 15.5 CI results on the final commit
 
-The final verification changes were committed to the existing PR branch. The final GitHub Actions run and its durations are recorded in the PR checks; the last observed run before these review fixes (`42197210602`) was green on all nine jobs. The final run re-executes the same nine jobs, now including the broadened web discovery, the release-commit guard, and the workflow-structure audit.
+**Final implementation/verification commit `efcbd81e` — GitHub Actions run `42216357510` (2026-11-06): all nine jobs green.**
+
+| Job | Duration |
+|---|---|
+| Realtime correctness | 5 m 03 s |
+| Unit tests (150 files, 1,196 tests) | 1 m 35 s |
+| TypeScript | 1 m 34 s |
+| Web build | 1 m 15 s |
+| Mobile chat loading | 45 s |
+| Environment isolation | 1 m 11 s |
+| ESLint advisory | 1 m 31 s |
+| Comment audit | 9 s |
+| Deployment targets (including the new release-guard tests) | 8 s |
+
+This report edit is docs-only; its follow-up run re-executes the same nine jobs. The PR checks page is authoritative for the final head.
 
 Local final results: web 150 files / 1,196 tests pass; realtime 23 files / 271 pass / 5 load-only skips / 0 fail in 225.62 s; mobile 28 security/config tests pass; web/realtime/mobile typechecks pass; web build passes; debug build passes; disposable-key APK and AAB signing verified.
 
@@ -407,4 +421,4 @@ Local final results: web 150 files / 1,196 tests pass; realtime 23 files / 271 p
 4. Run `npm run version:bump` before each release; the public pair remains 1.0.0 / 1.
 5. Existing Production approval and staging secrets are unchanged; no new GitHub secret is required for CI or the release gate.
 
-**PR #797 readiness:** the implementation and local verification are complete; the only unchecked item that requires account access is the real EAS upload certificate. PR #797 is ready to merge after the final CI run is green, with the manual EAS/Play certificate check and upload-keystore configuration completed before the next Android release.
+**PR #797 readiness:** the implementation and local verification are complete, and the final implementation commit's CI run is green. The only unchecked item that requires account access is the real EAS upload certificate. PR #797 is ready to merge; complete the manual EAS/Play certificate check and configure the upload keystore before the next Android release. Branch protection remains a recommended repository setting.
