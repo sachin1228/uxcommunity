@@ -12,7 +12,7 @@ import {
   applyCommunityPermissionPatch,
 } from "@/lib/communities/permissions";
 import { cleanDesignation } from "@/lib/communities/comment-authors";
-import { revokeRealtimeCommunityMembership } from "@/lib/realtime/revoke";
+import { attemptMembershipRevocationNow } from "@/lib/realtime/membership-revocation-queue";
 
 /**
  * GET /api/communities/[id]/members/[userId]
@@ -136,27 +136,31 @@ export async function DELETE(
     );
   }
 
-  // Remove membership + any permission grants in one go.
-  await db
-    .from("community_admin_permissions")
-    .delete()
-    .eq("community_id", communityId)
-    .eq("user_id", targetUserId);
+  // Delete the membership/grant rows and write the durable revocation row in
+  // one transaction. A crash cannot leave a removed member with no queued
+  // revocation, and a still-member cannot be queued by a failed delete.
+  const { data: removed, error: removeError } = await db.rpc(
+    "remove_community_member_with_revocation",
+    {
+      p_community_id: communityId,
+      p_user_id: targetUserId,
+    },
+  );
 
-  const { error } = await db
-    .from("community_members")
-    .delete()
-    .eq("community_id", communityId)
-    .eq("user_id", targetUserId);
-
-  if (error) return NextResponse.json({ error: "Failed to remove member." }, { status: 500 });
+  if (removeError) {
+    console.error("[remove member] atomic removal failed:", removeError);
+    return NextResponse.json({ error: "Failed to remove member." }, { status: 500 });
+  }
+  if (removed !== true) {
+    // The member is already gone (a concurrent removal or a retry). The
+    // removal goal is satisfied; the queue row from that path is durable.
+    return NextResponse.json({ success: true, already_removed: true });
+  }
 
   // A removed member must stop receiving the room immediately; the handshake
-  // check only covers future connections.
-  await revokeRealtimeCommunityMembership({
-    userId: targetUserId,
-    communityId,
-  });
+  // check only covers future connections. Failure leaves the queued row for
+  // the realtime Worker's minute cron.
+  await attemptMembershipRevocationNow(targetUserId, communityId);
 
   await logCommunityActivity(db, {
     communityId,

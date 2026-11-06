@@ -143,21 +143,33 @@ export function isShowcaseVideoKeyForMedia(key: string, mediaId: string): boolea
   return match[1].toLowerCase() === mediaId.trim().toLowerCase();
 }
 
-/** Staging → canonical key. The client can overwrite the staging URL until its
- *  presign expires, so finalize copies the verified object to a key no client
- *  has a signed URL for. */
-export function showcaseFinalVideoKeyForMedia(key: string, mediaId: string): string | null {
+/**
+ * Staging → claim-specific canonical key.
+ *
+ * The client can overwrite the staging URL until its presign expires, so
+ * finalize copies the verified object to a key no client has a signed URL
+ * for. The key includes the finalize claim token: a losing or stale claimant
+ * copies to a different key and can never overwrite the winner's object.
+ */
+export function showcaseFinalVideoKeyForClaim(
+  key: string,
+  mediaId: string,
+  claimToken: string,
+): string | null {
   if (!isShowcaseVideoKeyForMedia(key, mediaId)) return null;
   const extension = key.slice(key.lastIndexOf("."));
-  return `media/videos/finalized/${mediaId.trim().toLowerCase()}${extension}`;
+  return `media/videos/finalized/${mediaId.trim().toLowerCase()}/${claimToken.trim().toLowerCase()}${extension}`;
 }
 
 export function isShowcasePosterKeyForMedia(key: string, mediaId: string): boolean {
   return key === `media/videos/posters/${mediaId.trim().toLowerCase()}.jpg`;
 }
 
-export function showcaseFinalPosterKeyForMedia(mediaId: string): string {
-  return `media/videos/finalized/${mediaId.trim().toLowerCase()}-poster.jpg`;
+export function showcaseFinalPosterKeyForClaim(
+  mediaId: string,
+  claimToken: string,
+): string {
+  return `media/videos/finalized/${mediaId.trim().toLowerCase()}/${claimToken.trim().toLowerCase()}-poster.jpg`;
 }
 
 export interface VideoUploadTicket {
@@ -179,6 +191,36 @@ export interface VideoUploadTicket {
 export interface R2HeadMetadata {
   contentLength: number;
   contentType: string | null;
+  /** R2's content MD5 for a single-part PUT; the exact-bytes receipt. */
+  etag: string | null;
+}
+
+export function normalizeEtag(value: string | null | undefined): string {
+  return (value ?? "").trim().replace(/^W\//i, "").replace(/"/g, "");
+}
+
+/**
+ * True when the copied object is byte-identical to the staging object that
+ * was HEAD-verified. R2's ETag for these single-PUT objects is the content
+ * MD5; a concurrent overwrite between the HEAD and the copy changes it and is
+ * rejected rather than committed.
+ */
+export function copiedObjectMatches(
+  source: R2HeadMetadata,
+  copied: R2HeadMetadata | null,
+  expectedType: string,
+  expectedSize: number,
+): boolean {
+  if (!copied) return false;
+  const sourceEtag = normalizeEtag(source.etag);
+  const copiedEtag = normalizeEtag(copied.etag);
+  if (!sourceEtag || !copiedEtag || sourceEtag !== copiedEtag) return false;
+  return (
+    copied.contentLength === expectedSize &&
+    source.contentLength === expectedSize &&
+    copied.contentType !== null &&
+    copied.contentType.split(";")[0].trim().toLowerCase() === expectedType.toLowerCase()
+  );
 }
 
 export type VideoFinalizeRejection =
@@ -197,7 +239,7 @@ export type VideoFinalizeRejection =
   | "object_type_mismatch";
 
 export type VideoFinalizeDecision =
-  | { ok: true; finalKey: string }
+  | { ok: true }
   | { ok: false; reason: VideoFinalizeRejection };
 
 export interface VideoFinalizeInput {
@@ -277,7 +319,34 @@ export function evaluateShowcaseVideoFinalize(
     return { ok: false, reason: "object_type_mismatch" };
   }
 
-  const finalKey = showcaseFinalVideoKeyForMedia(key, mediaId);
-  if (!finalKey) return { ok: false, reason: "reference_mismatch" };
-  return { ok: true, finalKey };
+  return { ok: true };
+}
+
+export type FinalizeCommitResolution =
+  | "finalized_ours"
+  | "finalized_other"
+  | "retry";
+
+/**
+ * Interpret a commit RPC outcome after a possibly-lost response.
+ *
+ * A finalized ticket whose stored key is the one this request copied means the
+ * commit landed (return it; never delete the object). A finalized ticket with
+ * a different key means another claim won (delete this claim-scoped copy and
+ * return the winner). Anything else is safe to retry; when the RPC errored the
+ * caller must leave the claim-scoped object in place because the commit may
+ * have landed without a response.
+ */
+export function resolveFinalizeCommit(input: {
+  committed: boolean;
+  commitError: unknown;
+  current: { finalizedAt: number | null; finalKey: string | null } | null;
+  finalKey: string;
+}): FinalizeCommitResolution {
+  if (input.current?.finalizedAt != null) {
+    return input.current.finalKey === input.finalKey
+      ? "finalized_ours"
+      : "finalized_other";
+  }
+  return "retry";
 }

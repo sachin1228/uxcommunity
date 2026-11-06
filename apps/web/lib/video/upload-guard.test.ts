@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 // @ts-expect-error Node's type-stripping test runner requires an explicit TS extension.
-import { MAX_PROXY_BODY_BYTES, declaredBodyTooLarge, evaluateShowcaseVideoFinalize, isShowcaseVideoKey, isShowcaseVideoKeyForMedia, proxyUploadKind, readBoundedBody } from "./upload-guard.ts";
+import { MAX_PROXY_BODY_BYTES, copiedObjectMatches, declaredBodyTooLarge, evaluateShowcaseVideoFinalize, isShowcaseVideoKey, isShowcaseVideoKeyForMedia, normalizeEtag, proxyUploadKind, readBoundedBody, resolveFinalizeCommit, showcaseFinalPosterKeyForClaim, showcaseFinalVideoKeyForClaim } from "./upload-guard.ts";
 
 const FIFTY_MB = 50 * 1024 * 1024;
 const CHUNK = 64 * 1024;
@@ -145,14 +145,22 @@ test("finalize accepts only the ticket owner with a matching HEAD", () => {
     key,
     type: "video/mp4",
     reportedSize: 1_000,
-    object: { contentLength: 1_000, contentType: "video/mp4" },
+    object: { contentLength: 1_000, contentType: "video/mp4", etag: "\"etag-a\"" },
   };
 
   const accepted = evaluateShowcaseVideoFinalize(body);
   assert.equal(accepted.ok, true);
-  if (accepted.ok) {
-    assert.equal(accepted.finalKey, `media/videos/finalized/${mediaId}.mp4`);
-  }
+
+  const claimA = "11111111-1111-4111-8111-111111111111";
+  const claimB = "22222222-2222-4222-8222-222222222222";
+  const finalA = showcaseFinalVideoKeyForClaim(key, mediaId, claimA);
+  const finalB = showcaseFinalVideoKeyForClaim(key, mediaId, claimB);
+  assert.equal(finalA, `media/videos/finalized/${mediaId}/${claimA}.mp4`);
+  assert.notEqual(finalA, finalB, "a losing claim must not share the winner's key");
+  assert.equal(
+    showcaseFinalPosterKeyForClaim(mediaId, claimA),
+    `media/videos/finalized/${mediaId}/${claimA}-poster.jpg`,
+  );
 
   const unauthorized = evaluateShowcaseVideoFinalize({
     ...body,
@@ -163,14 +171,14 @@ test("finalize accepts only the ticket owner with a matching HEAD", () => {
 
   const oversized = evaluateShowcaseVideoFinalize({
     ...body,
-    object: { contentLength: 51 * 1024 * 1024, contentType: "video/mp4" },
+    object: { contentLength: 51 * 1024 * 1024, contentType: "video/mp4", etag: "\"etag-a\"" },
   });
   assert.equal(oversized.ok, false);
   if (!oversized.ok) assert.equal(oversized.reason, "object_too_large");
 
   const actualMismatch = evaluateShowcaseVideoFinalize({
     ...body,
-    object: { contentLength: 999, contentType: "video/mp4" },
+    object: { contentLength: 999, contentType: "video/mp4", etag: "\"etag-a\"" },
   });
   assert.equal(actualMismatch.ok, false);
   if (!actualMismatch.ok) assert.equal(actualMismatch.reason, "actual_size_mismatch");
@@ -199,7 +207,7 @@ test("finalize accepts only the ticket owner with a matching HEAD", () => {
 
   const spoofedType = evaluateShowcaseVideoFinalize({
     ...body,
-    object: { contentLength: 1_000, contentType: "text/html" },
+    object: { contentLength: 1_000, contentType: "text/html", etag: "\"etag-a\"" },
   });
   assert.equal(spoofedType.ok, false);
   if (!spoofedType.ok) assert.equal(spoofedType.reason, "object_type_mismatch");
@@ -212,4 +220,93 @@ test("finalize accepts only the ticket owner with a matching HEAD", () => {
   if (!expired.ok) assert.equal(expired.reason, "expired");
 
   assert.equal(evaluateShowcaseVideoFinalize({ ...body, ticket: null }).ok, false);
+});
+
+
+test("copied bytes must match the staging ETag and metadata", () => {
+  const source = {
+    contentLength: 1_000,
+    contentType: "video/mp4",
+    etag: "\"abc123\"",
+  };
+  assert.equal(
+    copiedObjectMatches(
+      source,
+      { contentLength: 1_000, contentType: "video/mp4", etag: "\"abc123\"" },
+      "video/mp4",
+      1_000,
+    ),
+    true,
+  );
+  // A concurrent PUT replaced the staging object between HEAD and copy.
+  assert.equal(
+    copiedObjectMatches(
+      source,
+      { contentLength: 1_000, contentType: "video/mp4", etag: "\"different\"" },
+      "video/mp4",
+      1_000,
+    ),
+    false,
+  );
+  assert.equal(
+    copiedObjectMatches(
+      source,
+      { contentLength: 999, contentType: "video/mp4", etag: "\"abc123\"" },
+      "video/mp4",
+      1_000,
+    ),
+    false,
+  );
+  assert.equal(
+    copiedObjectMatches(
+      source,
+      { contentLength: 1_000, contentType: "text/html", etag: "\"abc123\"" },
+      "video/mp4",
+      1_000,
+    ),
+    false,
+  );
+  // No ETag means exact-bytes verification failed; do not commit.
+  assert.equal(
+    copiedObjectMatches(
+      { ...source, etag: null },
+      { contentLength: 1_000, contentType: "video/mp4", etag: null },
+      "video/mp4",
+      1_000,
+    ),
+    false,
+  );
+  assert.equal(normalizeEtag('W/"abc"'), "abc");
+});
+
+
+test("a lost commit response is resolved by the stored final key", () => {
+  const finalKey = "media/videos/finalized/m/claim.mp4";
+  assert.equal(
+    resolveFinalizeCommit({
+      committed: false,
+      commitError: new Error("response lost"),
+      current: { finalizedAt: 1, finalKey },
+      finalKey,
+    }),
+    "finalized_ours",
+  );
+  assert.equal(
+    resolveFinalizeCommit({
+      committed: false,
+      commitError: null,
+      current: { finalizedAt: 1, finalKey: "media/videos/finalized/m/other.mp4" },
+      finalKey,
+    }),
+    "finalized_other",
+  );
+  assert.equal(
+    resolveFinalizeCommit({
+      committed: false,
+      commitError: new Error("db down"),
+      current: { finalizedAt: null, finalKey: null },
+      finalKey,
+    }),
+    "retry",
+  );
 });

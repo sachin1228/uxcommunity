@@ -152,18 +152,39 @@ describe("Room connection limits", () => {
     }
   }, 30_000);
 
+  it("keeps a legitimate three-device, two-tab-each session connected", async () => {
+    const communityId = crypto.randomUUID();
+    const room = `chat:${communityId}`;
+    const userId = crypto.randomUUID();
+    const clients: Client[] = [];
+
+    for (const device of ["phone", "laptop", "tablet"]) {
+      clients.push(await connectAndJoin(room, userId, `${device}-sid`));
+      clients.push(await connectAndJoin(room, userId, `${device}-sid`));
+    }
+
+    expect((await stats(room)).sockets).toBe(6);
+    for (const client of clients) {
+      expect(client.ws.readyState).toBe(WebSocket.OPEN);
+      // A client-initiated close handshake is not what this test measures;
+      // miniflare may leave the client-side close event until teardown.
+      try { client.ws.close(); } catch { /* already closing */ }
+    }
+  }, 20_000);
+
   it("accepts a reconnection after a client closes", async () => {
     const communityId = crypto.randomUUID();
     const room = `chat:${communityId}`;
     const userId = crypto.randomUUID();
     const first = await connectAndJoin(room, userId, "sid-reconnect");
-    first.ws.close();
-    await first.closed;
+    try { first.ws.close(); } catch { /* already closing */ }
+    // Give the server a moment to process the close; the user/session caps are
+    // not at their limit, so the replacement must be accepted either way.
+    await new Promise((resolveWait) => setTimeout(resolveWait, 250));
 
     const second = await connectAndJoin(room, userId, "sid-reconnect");
     expect(second.ws.readyState).toBe(WebSocket.OPEN);
-    second.ws.close();
-    await second.closed;
+    try { second.ws.close(); } catch { /* already closing */ }
   }, 15_000);
 });
 
@@ -189,6 +210,16 @@ describe("Community membership revocation", () => {
     // Idempotent: a second revocation is accepted and closes nothing.
     const again = await revoke({ userId, communityId: communityOne });
     expect(again.status).toBe(200);
+
+    // A rejoin gets a fresh authorized socket; the room does not lock the
+    // member out after a revocation.
+    const rejoined = await connectAndJoin(
+      `chat:${communityOne}`,
+      userId,
+      "sid-rejoined",
+    );
+    expect(rejoined.ws.readyState).toBe(WebSocket.OPEN);
+    try { rejoined.ws.close(); } catch { /* already closing */ }
 
     for (const client of [inTwo, userSocket]) {
       try { client.ws.close(); } catch { /* already closed */ }

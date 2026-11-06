@@ -295,24 +295,37 @@ export async function joinEventChat(
  * event they are no longer going to. The owner is never removed: their group
  * would lose the only person who can manage it, and they can re-RSVP.
  */
+export type LeaveEventChatResult = "removed" | "owner" | "failed";
+
 export async function leaveEventChat(
   db: Db,
   communityId: string,
   userId: string,
-): Promise<void> {
+): Promise<LeaveEventChatResult> {
   const { data: community } = await db
     .from("communities")
     .select("owner_id")
     .eq("id", communityId)
     .maybeSingle();
-  if ((community as { owner_id: string | null } | null)?.owner_id === userId) return;
+  if ((community as { owner_id: string | null } | null)?.owner_id === userId) {
+    return "owner";
+  }
 
-  const { error } = await db
-    .from("community_members")
-    .delete()
-    .eq("community_id", communityId)
-    .eq("user_id", userId);
-  if (error) console.error("[event-chat] membership removal failed:", error);
+  // Delete the membership and write the durable revocation row atomically.
+  const { data: removed, error } = await db.rpc(
+    "remove_community_member_with_revocation",
+    {
+      p_community_id: communityId,
+      p_user_id: userId,
+    },
+  );
+  if (error) {
+    console.error("[event-chat] membership removal failed:", error);
+    return "failed";
+  }
+  // `false` means the membership was already gone (another removal path); the
+  // caller may still attempt the immediate socket close for a stale socket.
+  return typeof removed === "boolean" ? "removed" : "failed";
 }
 
 /**

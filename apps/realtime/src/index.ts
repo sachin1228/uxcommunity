@@ -17,6 +17,7 @@ import { logEvent } from "./log";
 import { runRetentionSweep } from "./retention";
 import { runEventLifecycleNotifications } from "./event-notifications";
 import { runVerificationReapplyEmails } from "./verification-emails";
+import { runMembershipRevocationRetries } from "./membership-revocations";
 export { UserDO } from "./user";
 export { Room } from "./room";
 export { AlertMonitor } from "./alert-monitor";
@@ -55,8 +56,11 @@ const FANOUT_RETRY_JITTER = 0.3;
  * registry checks. It is per Worker isolate, so it is a burst damper, not a
  * global quota — the DO caps remain the hard limit on retained sockets.
  */
-const UPGRADE_BURST = 600;
-const UPGRADE_REFILL_PER_SECOND = 100;
+// Sized for a shared NAT/office with several hundred devices, not a single
+// user: the Room DO's per-user/per-session caps are the authoritative limit.
+// This only stops an unauthenticated flood from spending CPU on auth checks.
+const UPGRADE_BURST = 1_200;
+const UPGRADE_REFILL_PER_SECOND = 200;
 const UPGRADE_BUCKET_MAX_IPS = 5_000;
 const upgradeBuckets = new Map<string, { tokens: number; updatedAt: number }>();
 
@@ -175,10 +179,18 @@ export default {
       return;
     }
     if (controller.cron === EVENT_LIFECYCLE_CRON) {
-      await runEventLifecycleNotifications(env);
-      // The reapply email is due once a member's one-month window opens; the
-      // per-user sent timestamp makes a minute tick cheap and idempotent.
-      await runVerificationReapplyEmails(env);
+      // Independent jobs; run them together so a slow notification/email
+      // endpoint cannot delay (or starve) the security-critical membership
+      // revocation drain. Each driver catches its own failures.
+      await Promise.all([
+        runEventLifecycleNotifications(env),
+        // The reapply email is due once a member's one-month window opens; the
+        // per-user sent timestamp makes a minute tick cheap and idempotent.
+        runVerificationReapplyEmails(env),
+        // A membership removal whose immediate socket close failed stays in
+        // the durable queue until this tick (or a later one) confirms it.
+        runMembershipRevocationRetries(env),
+      ]);
       return;
     }
     if (controller.cron !== ALERT_MONITOR_CRON) {
